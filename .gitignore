@@ -1,0 +1,15 @@
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+.env
+.env.*
+
+# 이 컴퓨터에서만 쓰는 설정
+.claude/
+
+# 예전 Apps Script 버전 (배포하지 않음)
+_이전_앱스크립트/
+
+# 비밀값을 잠깐 넘길 때 쓰는 파일
+.secret-tmp.json

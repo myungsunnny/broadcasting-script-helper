@@ -1,0 +1,16 @@
+# 이 파일을 .dev.vars 로 복사해 로컬 테스트용 값을 넣으세요. (.dev.vars는 git에 올리지 않습니다)
+# 실제 배포에서는 `npx wrangler secret put 이름` 으로 같은 값을 넣습니다.
+# 이 예시 파일은 공개 저장소에 올라가므로 실제 값을 쓰지 마세요.
+
+# Gemini API 키 (https://aistudio.google.com/apikey)
+GEMINI_API_KEY=
+
+# 선생님 비밀번호 (학생 계정 관리, 대본 '완료' 처리, 삭제 가능)
+# 학생은 선생님이 [학생 계정] 화면에서 만들어 준 개인 계정으로 로그인합니다.
+TEACHER_PASSWORD=
+
+# 로그인 쿠키 서명용 임의의 긴 문자열 (아무 글자나 32자 이상)
+SESSION_SECRET=
+
+# 학교 주간계획 구글 시트 ID (시트 주소의 /d/ 와 /edit 사이)
+PLAN_SHEET_ID=

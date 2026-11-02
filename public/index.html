@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#CC3138">
+  <title>방송부 대본 도우미</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='28' fill='%23CC3138'/><circle cx='50' cy='50' r='16' fill='%23FDFDFE'/></svg>">
+  <!-- 글꼴: 본문 Pretendard(또렷함), 제목 Jua(귀여움) / 아이콘: Phosphor -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="/" class="brand" id="brandLink">
+      <span class="brand-mark"><i class="ph-fill ph-microphone-stage"></i></span>
+      <span class="brand-text"><span id="schoolName" class="brand-school hide-sm">우리학교</span><span class="brand-name">방송부 대본 도우미</span></span>
+    </a>
+    <button class="btn-ghost btn-sm" id="btnHelp"><i class="ph ph-question"></i><span class="hide-sm">사용법</span></button>
+    <span id="userBox" class="user-box hidden">
+      <button class="btn-ghost btn-sm" id="btnCalendar"><i class="ph ph-calendar-dots"></i><span class="hide-sm">일정</span></button>
+      <span id="userName" class="user-name"></span>
+      <button class="btn-ghost btn-sm hidden" id="btnAccounts"><i class="ph ph-users-three"></i><span class="hide-sm">학생 계정</span></button>
+      <button class="btn-ghost btn-sm hidden" id="btnPassword"><i class="ph ph-key"></i><span class="hide-sm">비밀번호</span></button>
+      <button class="btn-ghost btn-sm" id="btnLogout" aria-label="로그아웃"><i class="ph ph-sign-out"></i><span class="hide-sm">로그아웃</span></button>
+    </span>
+  </header>
+
+  <main>
+    <div id="setupNotice" class="notice notice-warn hidden"></div>
+
+    <!-- 로그인 -->
+    <section id="loginView" class="hidden">
+      <form class="card login-card" id="loginForm">
+        <span class="login-mark"><i class="ph-fill ph-microphone-stage"></i></span>
+        <h2 class="display">방송부 로그인</h2>
+        <div class="field">
+          <label for="loginName">아이디</label>
+          <input id="loginName" autocomplete="username" placeholder="선생님이 알려 준 아이디" required>
+        </div>
+        <div class="field">
+          <label for="loginPw">비밀번호</label>
+          <input id="loginPw" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn-primary btn-lg" type="submit">들어가기</button>
+        <a href="/?help" class="link-btn help-link" data-nav="?help"><i class="ph ph-book-open-text"></i>처음이라면 사용법 먼저 보기</a>
+        <p class="muted small">계정은 방송부 선생님이 만들어 줘요. 비밀번호를 잊으면 선생님께 초기화를 부탁하세요.
+          선생님은 이름과 선생님 비밀번호로 들어가요.</p>
+      </form>
+    </section>
+
+    <!-- 학생 계정 관리 (선생님) -->
+    <section id="accountsView" class="hidden">
+      <div class="page-head">
+        <button class="btn-ghost" id="btnAccountsBack"><i class="ph ph-arrow-left"></i>대본 목록</button>
+        <h2 class="display">학생 계정 관리</h2>
+      </div>
+
+      <div id="issuedBox" class="card issued hidden">
+        <div class="card-head">
+          <h3><i class="ph ph-key"></i>새 비밀번호 안내</h3>
+          <span class="grow"></span>
+          <button id="btnPrintIssued" class="btn-ghost btn-sm no-print"><i class="ph ph-printer"></i>인쇄</button>
+          <button id="btnCloseIssued" class="btn-ghost btn-sm no-print">닫기</button>
+        </div>
+        <p class="muted small no-print">이 비밀번호는 지금 한 번만 보여요. 학생에게 알려 주세요. 학생은 처음 들어올 때 자기 비밀번호로 바꿔요.</p>
+        <table class="table"><thead><tr><th>이름</th><th>아이디</th><th>임시 비밀번호</th></tr></thead><tbody id="issuedBody"></tbody></table>
+      </div>
+
+      <div class="card">
+        <h3><i class="ph ph-user-plus"></i>학생 추가</h3>
+        <div class="field">
+          <label for="newNames">학생 이름 (한 줄에 한 명, 여러 명 한꺼번에 가능)</label>
+          <textarea id="newNames" class="short" placeholder="5학년 김방송&#10;6학년 이아나"></textarea>
+          <p class="muted small">아이디는 이름과 같게 만들어져요. 같은 이름이 있으면 뒤에 숫자가 붙어요. 비밀번호는 4자리 숫자로 자동으로 정해져요.</p>
+        </div>
+        <button class="btn-primary" id="btnAddUsers"><i class="ph ph-plus"></i>계정 만들기</button>
+      </div>
+
+      <div class="card">
+        <h3><i class="ph ph-users-three"></i>계정 목록 <span class="muted small" id="userCount"></span></h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>이름</th><th>아이디</th><th>상태</th><th>마지막 로그인</th><th></th></tr></thead>
+            <tbody id="userBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 대본 목록 -->
+    <section id="listView" class="hidden">
+      <div class="notice notice-info first-help hidden" id="firstHelp">
+        <i class="ph ph-hand-waving"></i>
+        <span class="grow">처음 왔나요? 3분이면 다 읽는 <b>사용법</b>을 먼저 봐요.</span>
+        <a href="/?help" class="btn btn-primary btn-sm" data-nav="?help">사용법 보기</a>
+        <button class="btn-ghost btn-sm" id="btnHideFirstHelp" aria-label="안내 닫기"><i class="ph ph-x"></i></button>
+      </div>
+      <button class="hero-btn" id="btnThisWeek">
+        <span class="hero-icon"><i class="ph-fill ph-microphone-stage"></i></span>
+        <span class="hero-copy">
+          <b id="thisWeekTitle" class="display">이번 주 대본 만들기</b>
+          <span id="thisWeekSub">AI와 함께 차근차근 만들어요</span>
+        </span>
+        <i class="ph ph-arrow-right hero-arrow"></i>
+      </button>
+      <div class="card upcoming-card" id="upcomingCard">
+        <div class="card-head">
+          <h3><i class="ph ph-calendar-dots"></i>다가오는 방송부 일정</h3>
+          <span class="grow"></span>
+          <a href="/?calendar" class="btn btn-ghost btn-sm" data-go="?calendar">캘린더 열기<i class="ph ph-arrow-right"></i></a>
+        </div>
+        <div id="upcomingList" class="upcoming-list"></div>
+      </div>
+      <div class="list-tools">
+        <div class="search">
+          <i class="ph ph-magnifying-glass"></i>
+          <input id="search" placeholder="지난 대본 찾기 (제목, 이름)" aria-label="지난 대본 찾기">
+        </div>
+        <select id="statusFilter" aria-label="상태로 거르기"><option value="">전체</option></select>
+        <button class="btn-ghost" id="btnNew"><i class="ph ph-calendar-blank"></i>다른 날 대본</button>
+      </div>
+      <div id="listBox" class="list"></div>
+    </section>
+
+    <!-- 대본 만들기 (4단계) -->
+    <section id="editView" class="hidden">
+      <nav class="stepper" id="stepper" aria-label="대본 만들기 단계">
+        <button type="button" data-step="1"><span class="step-num"><i class="ph ph-microphone"></i></span><span class="step-label">누가 방송해요?</span></button>
+        <button type="button" data-step="2"><span class="step-num"><i class="ph ph-list-checks"></i></span><span class="step-label">무엇을 소개해요?</span></button>
+        <button type="button" data-step="3"><span class="step-num"><i class="ph ph-magic-wand"></i></span><span class="step-label">AI 초안</span></button>
+        <button type="button" data-step="4"><span class="step-num"><i class="ph ph-pencil-simple-line"></i></span><span class="step-label">읽으며 고치기</span></button>
+      </nav>
+
+      <div class="notice notice-ok hidden" id="lockedNotice"><i class="ph-fill ph-seal-check"></i><span>선생님이 <b>완료</b>한 대본이에요. 읽기만 할 수 있어요.</span></div>
+      <div class="notice notice-info hidden" id="memoBanner"></div>
+
+      <!-- 1단계 -->
+      <div class="step" data-step="1">
+        <div class="card big-card">
+          <h2 class="display">누가 방송하나요?</h2>
+          <p class="muted meta-line">
+            <i class="ph ph-calendar-check"></i><b id="dateText"></b> 방송 <span class="sep"></span> <span id="titleText"></span>
+            <button type="button" class="link-btn" id="btnEditMeta">바꾸기</button>
+          </p>
+          <div class="grid hidden" id="metaBox">
+            <div class="field"><label for="f-broadcast_date">방송일 (금요일)</label><input type="date" id="f-broadcast_date"></div>
+            <div class="field span2"><label for="f-title">제목</label><input id="f-title" placeholder="예: 11월 첫째 주 금요방송"></div>
+          </div>
+          <div class="seg big-seg" role="group" aria-label="아나운서 수">
+            <button type="button" data-count="1"><i class="ph ph-user"></i>1명</button>
+            <button type="button" data-count="2"><i class="ph ph-users"></i>2명</button>
+          </div>
+          <div class="ann-row">
+            <input id="f-ann1" maxlength="20" class="big-input" placeholder="아나운서 이름" aria-label="아나운서 이름">
+            <input id="f-ann2" maxlength="20" class="big-input" placeholder="두 번째 아나운서 이름" aria-label="두 번째 아나운서 이름">
+          </div>
+          <p class="muted small">이름은 인사말과 마무리 인사에 들어가요.</p>
+        </div>
+      </div>
+
+      <!-- 2단계 -->
+      <div class="step" data-step="2">
+        <div class="card big-card">
+          <h2 class="display"><span class="h-icon"><i class="ph ph-calendar-check"></i></span>다음 주 행사 중에서 소개할 것을 골라요</h2>
+          <div class="pick-box" id="pick-events"></div>
+        </div>
+        <div class="card big-card">
+          <h2 class="display"><span class="h-icon"><i class="ph ph-push-pin"></i></span>계기교육 주제를 하나 골라요</h2>
+          <div class="pick-box" id="pick-topics"></div>
+        </div>
+        <div class="card big-card">
+          <h2 class="display"><span class="h-icon"><i class="ph ph-book-open-text"></i></span>사자성어 <span class="muted small plain">안 정해도 돼요</span></h2>
+          <input id="topic-idiom" aria-label="사자성어 주제" placeholder="원하는 주제가 있으면 써요. 예: 우정, 끈기 (비우면 AI가 골라요)">
+        </div>
+      </div>
+
+      <!-- 3단계 -->
+      <div class="step" data-step="3">
+        <div class="card big-card ai-card">
+          <span class="ai-mark"><i class="ph-fill ph-magic-wand"></i></span>
+          <h2 class="display">AI가 대본 초안을 써 줘요</h2>
+          <p class="muted">버튼을 한 번만 누르고 기다려요. 1분쯤 걸려요.</p>
+          <button class="btn-primary btn-xl" id="btnAll"><i class="ph ph-sparkle"></i>대본 초안 만들기</button>
+          <ul class="progress-list" id="aiProgress"></ul>
+          <p class="muted small" id="aiAfterNote"></p>
+        </div>
+      </div>
+
+      <!-- 4단계 -->
+      <div class="step" data-step="4">
+        <div class="section-tabs" id="sectionTabs" role="tablist"></div>
+        <div id="sectionsBox"></div>
+        <div class="card memo-card">
+          <div class="field">
+            <label for="f-memo"><i class="ph ph-chat-circle-text"></i>메모 (방송에서 읽지 않아요. 선생님과 부원이 함께 봐요)</label>
+            <textarea id="f-memo" class="short" placeholder="고칠 점, 전달 사항 등을 남겨요"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-nav">
+        <button class="btn-ghost" id="btnPrev"><i class="ph ph-arrow-left"></i>이전</button>
+        <span class="nav-status">
+          <span id="saveState"></span>
+          <span id="readTime"></span>
+        </span>
+        <button class="btn-primary" id="btnNext">다음<i class="ph ph-arrow-right"></i></button>
+        <button class="btn-ghost hidden" id="btnRead"><i class="ph ph-file-text"></i><span class="hide-sm">방송용 보기</span></button>
+        <button class="btn-primary hidden" id="btnReview"></button>
+        <details class="more">
+          <summary aria-label="더 보기"><i class="ph ph-dots-three"></i></summary>
+          <div class="more-menu">
+            <button class="btn-menu" id="btnBack"><i class="ph ph-list"></i>대본 목록으로</button>
+            <button class="btn-menu" id="btnShare"><i class="ph ph-link-simple"></i>링크 복사</button>
+            <button class="btn-menu" id="btnHistory"><i class="ph ph-clock-counter-clockwise"></i>수정 기록</button>
+            <label class="teacher-only menu-field">상태 <select id="f-status"></select></label>
+            <button class="btn-menu danger teacher-only" id="btnDelete"><i class="ph ph-trash"></i>삭제</button>
+            <span class="muted small" id="metaInfo"></span>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- 방송부 일정 캘린더 -->
+    <section id="calendarView" class="hidden">
+      <div class="cal-head">
+        <h2 class="display" id="calTitle"></h2>
+        <span class="grow"></span>
+        <div class="seg">
+          <button id="calPrev" aria-label="이전 달"><i class="ph ph-caret-left"></i></button>
+          <button id="calToday">오늘</button>
+          <button id="calNext" aria-label="다음 달"><i class="ph ph-caret-right"></i></button>
+        </div>
+        <button class="btn-primary" id="btnAddEvent"><i class="ph ph-plus"></i><span>일정 추가</span></button>
+      </div>
+      <div class="cal-legend">
+        <span class="cat cat-방송">방송</span><span class="cat cat-연습">연습</span><span class="cat cat-회의">회의</span><span class="cat cat-기타">기타</span>
+        <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>
+      </div>
+
+      <div class="card cal-card">
+        <div class="cal-weekdays"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+        <div class="cal-grid" id="calGrid" role="grid" aria-label="달력"></div>
+      </div>
+
+      <div class="card day-card">
+        <div class="card-head">
+          <h3 id="dayTitle"></h3>
+          <span class="grow"></span>
+          <button class="btn-soft btn-sm" id="btnAddEventDay"><i class="ph ph-plus"></i>이날 일정 추가</button>
+        </div>
+        <div id="dayList" class="day-list"></div>
+      </div>
+    </section>
+
+    <!-- 사용법 -->
+    <section id="helpView" class="hidden">
+      <div class="page-head">
+        <button class="btn-ghost" id="btnHelpBack"><i class="ph ph-arrow-left"></i>돌아가기</button>
+      </div>
+
+      <div class="help-hero">
+        <span class="login-mark"><i class="ph-fill ph-book-open-text"></i></span>
+        <div>
+          <h2 class="display">방송부 대본 도우미 사용법</h2>
+          <p class="muted">AI와 함께 금요방송 대본을 만들어요. 아래 순서대로 따라 하면 돼요.</p>
+        </div>
+      </div>
+
+      <nav class="help-toc" aria-label="사용법 차례">
+        <a href="#h-start">들어가기</a>
+        <a href="#h-step1">1 누가 방송해요?</a>
+        <a href="#h-step2">2 무엇을 소개해요?</a>
+        <a href="#h-step3">3 AI 초안</a>
+        <a href="#h-step4">4 읽으며 고치기</a>
+        <a href="#h-review">검토 받기</a>
+        <a href="#h-air">방송하는 날</a>
+        <a href="#h-calendar">일정 캘린더</a>
+        <a href="#h-promise">AI 약속</a>
+        <a href="#h-faq">궁금해요</a>
+        <a href="#h-teacher" class="teacher-only">선생님 안내</a>
+      </nav>
+
+      <article class="card help-card" id="h-start">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-sign-in"></i></span>들어가기</h3>
+        <ol class="help-steps">
+          <li><b>아이디</b>와 <b>비밀번호</b>를 넣고 <span class="btn btn-primary btn-sm demo">들어가기</span>를 눌러요. 아이디는 보통 내 이름이에요.</li>
+          <li>처음 들어오면 <b>비밀번호 바꾸기</b> 창이 떠요. 나만 아는 새 비밀번호(4글자 이상)로 바꿔요.</li>
+          <li>비밀번호를 잊어버렸다면 선생님께 <b>초기화</b>를 부탁해요.</li>
+        </ol>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>들어가면 맨 위에 빨간 큰 버튼 <b>이번 주 대본 만들기</b>가 보여요. 이 버튼 하나로 시작해요. 이미 만들던 대본이 있으면 <b>이어서 만들기</b>로 바뀌어요.</span></div>
+      </article>
+
+      <article class="card help-card" id="h-step1">
+        <h3 class="help-title"><span class="step-badge">1</span>누가 방송해요?</h3>
+        <ol class="help-steps">
+          <li>함께 방송하는 사람 수를 골라요. <span class="seg demo"><span class="btn">1명</span><span class="btn on">2명</span></span></li>
+          <li>아나운서 <b>이름</b>을 써요. 이름은 인사말과 마무리 인사에 그대로 들어가요.</li>
+          <li><span class="btn btn-primary btn-sm demo">다음<i class="ph ph-arrow-right"></i></span>을 눌러요.</li>
+        </ol>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>방송일은 자동으로 이번 주 금요일로 정해져요. 다른 날이면 날짜 옆 <b>바꾸기</b>를 눌러요.</span></div>
+      </article>
+
+      <article class="card help-card" id="h-step2">
+        <h3 class="help-title"><span class="step-badge">2</span>무엇을 소개해요?</h3>
+        <ol class="help-steps">
+          <li><b>다음 주 행사</b> 목록에서 방송으로 알릴 행사를 <b>체크</b>해요. 학교 주간계획에서 학생 행사만 골라 왔어요.</li>
+          <li>목록이 이상하거나 선생님이 시트를 고쳤다면 <span class="btn btn-soft btn-sm demo"><i class="ph ph-arrow-clockwise"></i>학교 행사 다시 확인</span>을 눌러요. 새로 생긴 행사에는 <span class="badge badge-new">새로 생김</span>이 붙어요.</li>
+          <li><b>계기교육 주제</b>를 하나 골라요. 다가오는 기념일, 우리 학교 교육주간, 계절 주제 중에서 고르거나 <b>직접 정하기</b>에 써도 돼요.</li>
+          <li><b>사자성어</b> 주제는 안 정해도 돼요. 비워 두면 AI가 골라요.</li>
+        </ol>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>선생님이 미리 골라 두었다면 이미 체크되어 있어요. 그대로 다음으로 가도 돼요.</span></div>
+      </article>
+
+      <article class="card help-card" id="h-step3">
+        <h3 class="help-title"><span class="step-badge">3</span>AI 초안 만들기</h3>
+        <ol class="help-steps">
+          <li><span class="btn btn-primary btn-sm demo"><i class="ph ph-sparkle"></i>대본 초안 만들기</span>를 <b>한 번만</b> 눌러요.</li>
+          <li>1분쯤 기다려요. 인사말, 학교 행사, 사자성어, 계기교육, 마무리 인사가 하나씩 <b>완성!</b>으로 바뀌어요.</li>
+          <li>다 되면 저절로 4단계로 넘어가요.</li>
+        </ol>
+        <div class="help-tip warn"><i class="ph ph-warning-circle"></i><span><b>AI가 지금 바빠요</b>라고 나오면 1~2분 뒤에 다시 눌러요. 여러 번 연달아 누르면 더 느려져요.</span></div>
+      </article>
+
+      <article class="card help-card" id="h-step4">
+        <h3 class="help-title"><span class="step-badge">4</span>읽으며 고치기</h3>
+        <ol class="help-steps">
+          <li>위쪽 탭에서 <b>인사말 → 학교 행사 → 사자성어 → 계기교육 → 마무리 인사</b>를 하나씩 열어요.</li>
+          <li><b>소리 내어 읽어 봐요.</b> 읽기 어려운 말, 틀린 내용은 대본 칸에서 직접 고쳐요.</li>
+          <li>AI에게 다시 부탁할 수도 있어요.
+            <span class="demo-row"><span class="btn chip demo">더 짧게</span><span class="btn chip demo">더 길게</span><span class="btn chip demo">더 쉽게</span><span class="btn chip demo">더 재미있게</span><span class="btn chip demo">처음부터 다시</span></span>
+            원하는 것이 따로 있으면 <b>직접 부탁하기</b> 칸에 "퀴즈를 하나 넣어 줘"처럼 쓰고 <b>부탁하기</b>를 눌러요.</li>
+          <li>2명이 방송하면 대본이 <span class="speaker speaker-0">김방송</span><span class="speaker speaker-1">이아나</span>처럼 이름표로 나뉘어요. 같이 말하는 줄은 <span class="speaker speaker-both">함께</span>예요.</li>
+        </ol>
+        <div class="help-tip"><i class="ph ph-cloud-check"></i><span><b>저장 버튼이 없어요.</b> 고치면 몇 초 뒤 저절로 저장돼요. 아래쪽에 <b>자동 저장됨</b>이 보이면 안심해요.</span></div>
+      </article>
+
+      <article class="card help-card" id="h-review">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-hand-waving"></i></span>선생님께 검토 받기</h3>
+        <ol class="help-steps">
+          <li>다 고쳤으면 아래쪽 <span class="btn btn-primary btn-sm demo"><i class="ph ph-hand-waving"></i>검토 요청</span>을 눌러요.</li>
+          <li>선생님이 남긴 <b>메모</b>는 대본 맨 위 파란 칸에 보여요. 메모를 보고 다시 고쳐요.</li>
+          <li>선생님이 <span class="badge badge-완료">완료</span>로 바꾸면 대본이 잠겨요. 이제 읽기만 할 수 있어요.</li>
+        </ol>
+      </article>
+
+      <article class="card help-card" id="h-air">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-microphone-stage"></i></span>방송하는 날</h3>
+        <ol class="help-steps">
+          <li>4단계 아래쪽 <span class="btn btn-ghost btn-sm demo"><i class="ph ph-file-text"></i>방송용 보기</span>를 누르면 큰 글씨 대본이 나와요.</li>
+          <li><b>가- 가+</b> 버튼으로 글자 크기를 바꿔요. 종이가 필요하면 <b>인쇄</b>를 눌러요.</li>
+          <li>방송 전에 아나운서끼리 한 번 소리 내어 연습해요. 화면 아래에 보이는 <b>읽는 시간</b>을 참고해요.</li>
+        </ol>
+      </article>
+
+      <article class="card help-card" id="h-calendar">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-calendar-dots"></i></span>방송부 일정 캘린더</h3>
+        <ol class="help-steps">
+          <li>위쪽 <span class="btn btn-ghost btn-sm demo"><i class="ph ph-calendar-dots"></i>일정</span>을 누르면 한 달 달력이 나와요. 대본 목록 위 <b>다가오는 방송부 일정</b>에서도 열 수 있어요.</li>
+          <li>날짜를 누르면 그날 일정이 아래에 자세히 보여요. 대본이 있는 날에는 <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>도 함께 보이고, 누르면 그 대본이 열려요.</li>
+          <li><span class="btn btn-primary btn-sm demo"><i class="ph ph-plus"></i>일정 추가</span>를 눌러 종류(<span class="cat cat-방송">방송</span> <span class="cat cat-연습">연습</span> <span class="cat cat-회의">회의</span> <span class="cat cat-기타">기타</span>), 이름, 시간, 함께하는 부원, 할 일을 써요.</li>
+          <li>일정이 끝나면 <span class="btn btn-soft btn-sm demo"><i class="ph ph-notebook"></i>기록 남기기</span>를 눌러 어떻게 됐는지 적어요. 다음 방송 때 큰 도움이 돼요.</li>
+        </ol>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>일정은 방송부 모두가 함께 보고 고칠 수 있어요. 지우기는 만든 사람과 선생님만 할 수 있어요.</span></div>
+      </article>
+
+      <article class="card help-card promise" id="h-promise">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-handshake"></i></span>AI와 함께 쓸 때 약속</h3>
+        <ul class="promise-list">
+          <li><i class="ph-fill ph-check-circle"></i><span><b>AI 글은 초안이에요.</b> 꼭 읽어 보고 내 말투로 고쳐요.</span></li>
+          <li><i class="ph-fill ph-check-circle"></i><span><b>날짜와 사실은 확인해요.</b> AI도 틀릴 수 있어요. 이상하면 선생님께 물어봐요.</span></li>
+          <li><i class="ph-fill ph-check-circle"></i><span><b>친구 정보는 쓰지 않아요.</b> 아나운서 이름 말고는 친구 이름, 전화번호, 주소를 대본에 넣지 않아요.</span></li>
+          <li><i class="ph-fill ph-check-circle"></i><span><b>버튼은 한 번만.</b> AI가 쓰는 동안 기다려요.</span></li>
+        </ul>
+      </article>
+
+      <section class="card help-card" id="h-faq">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-question"></i></span>이럴 땐 어떻게 해요?</h3>
+        <details class="faq"><summary>저장 버튼이 안 보여요.</summary><p>자동으로 저장돼요. 화면 아래 <b>자동 저장됨</b> 글자를 확인해요. <b>저장 안 됨</b>이 보이면 인터넷 연결을 확인하고 조금 뒤 다시 고쳐 봐요.</p></details>
+        <details class="faq"><summary>"다른 사람이 먼저 수정했어요"라고 나와요.</summary><p>친구가 같은 대본을 동시에 고쳤어요. 내가 쓴 부분을 복사해 두고 <b>새로고침</b>한 뒤, 친구 내용과 합쳐서 다시 고쳐요.</p></details>
+        <details class="faq"><summary>AI가 대본을 못 만들었어요.</summary><p>AI가 바쁠 때가 있어요. 1~2분 뒤 다시 눌러요. 일부만 못 만들었다면 4단계에서 그 탭을 열고 <b>처음부터 다시</b>를 눌러요.</p></details>
+        <details class="faq"><summary>행사 목록에 이번 주 행사가 안 보여요.</summary><p>방송일 <b>다음 주</b>(월~금) 행사만 보여요. 방송일이 맞는지 확인하고, <b>학교 행사 다시 확인</b>을 눌러요. 그래도 없으면 선생님께 주간계획 시트를 확인해 달라고 해요.</p></details>
+        <details class="faq"><summary>대본이 잠겨서 고칠 수 없어요.</summary><p>선생님이 <b>완료</b>한 대본이에요. 더 고쳐야 하면 선생님께 말씀드려요.</p></details>
+        <details class="faq"><summary>비밀번호를 잊어버렸어요.</summary><p>선생님께 <b>비밀번호 초기화</b>를 부탁해요. 새 임시 비밀번호로 들어가서 다시 바꾸면 돼요.</p></details>
+      </section>
+
+      <section class="card help-card teacher-only" id="h-teacher">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-chalkboard-teacher"></i></span>선생님 안내</h3>
+        <ul class="help-steps plain-list">
+          <li><b>학생 계정</b>: 위쪽 <b>학생 계정</b>에서 이름을 한 줄에 한 명씩 넣으면 4자리 임시 비밀번호가 만들어져요. 표를 인쇄해 나눠 주세요.</li>
+          <li><b>미리 골라 두기</b>: 이번 주 대본을 먼저 열어 행사와 계기교육 주제를 골라 두면 학생 화면에도 그대로 보여요.</li>
+          <li><b>검토하기</b>: 목록에서 <span class="badge badge-검토요청">검토요청</span> 대본을 열고, 4단계의 메모 칸에 피드백을 남겨 주세요.</li>
+          <li><b>완료와 삭제</b>: 오른쪽 아래 <b>⋯</b> 메뉴에서 상태를 <span class="badge badge-완료">완료</span>로 바꾸거나 대본을 삭제할 수 있어요.</li>
+          <li><b>되돌리기</b>: ⋯ 메뉴의 <b>수정 기록</b>에서 예전 내용을 미리 보고 되돌릴 수 있어요.</li>
+        </ul>
+      </section>
+
+      <div class="help-end">
+        <button class="btn-primary btn-lg" id="btnHelpStart"><i class="ph ph-microphone-stage"></i>이번 주 대본 만들러 가기</button>
+      </div>
+    </section>
+
+    <!-- 방송용(읽기) 보기 -->
+    <section id="readView" class="hidden">
+      <div class="page-head no-print">
+        <button class="btn-ghost" id="btnBackToEdit"><i class="ph ph-arrow-left"></i>편집으로</button>
+        <span class="grow"></span>
+        <button class="btn-ghost" id="btnCopyText"><i class="ph ph-copy"></i><span class="hide-sm">글자 복사</span></button>
+        <button class="btn-ghost" onclick="window.print()"><i class="ph ph-printer"></i><span class="hide-sm">인쇄</span></button>
+        <div class="seg font-seg" role="group" aria-label="글자 크기">
+          <button id="btnFontDown" aria-label="글자 작게">가-</button>
+          <button id="btnFontUp" aria-label="글자 크게">가+</button>
+        </div>
+      </div>
+      <div class="card reading" id="readBox"></div>
+    </section>
+  </main>
+
+  <!-- 수정 기록 창 -->
+  <dialog id="historyDialog">
+    <div class="dialog-head"><h3><i class="ph ph-clock-counter-clockwise"></i>수정 기록</h3><button class="btn-ghost btn-sm" id="btnCloseHistory">닫기</button></div>
+    <p class="muted small">저장할 때마다 바로 전 내용이 기록돼요. 눌러서 미리 보고 되돌릴 수 있어요.</p>
+    <div id="historyList"></div>
+    <div id="historyPreview" class="hidden">
+      <div class="reading small-reading" id="historyBody"></div>
+      <div class="dialog-actions"><button class="btn-ghost" id="btnHistoryBack"><i class="ph ph-arrow-left"></i>기록 목록</button><span class="grow"></span><button class="btn-primary" id="btnRestore">이 내용으로 되돌리기</button></div>
+    </div>
+  </dialog>
+
+  <!-- 일정 넣기·고치기 창 -->
+  <dialog id="eventDialog">
+    <form id="eventForm">
+      <div class="dialog-head"><h3 id="eventDialogTitle"><i class="ph ph-calendar-plus"></i>일정 추가</h3><button type="button" class="btn-ghost btn-sm" id="btnCloseEvent">닫기</button></div>
+      <div class="field">
+        <span class="field-label">종류</span>
+        <div class="seg cat-seg" id="evCategory" role="radiogroup" aria-label="일정 종류">
+          <button type="button" data-cat="방송">방송</button>
+          <button type="button" data-cat="연습">연습</button>
+          <button type="button" data-cat="회의">회의</button>
+          <button type="button" data-cat="기타">기타</button>
+        </div>
+      </div>
+      <div class="field"><label for="evTitle">일정 이름</label><input id="evTitle" maxlength="60" required placeholder="예: 금요방송 리허설"></div>
+      <div class="grid two">
+        <div class="field"><label for="evDate">날짜</label><input type="date" id="evDate" required></div>
+        <div class="field"><label for="evTime">시간 (안 써도 돼요)</label><input type="time" id="evTime"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">함께하는 부원</span>
+        <div class="member-picks" id="evMembers"></div>
+      </div>
+      <div class="field"><label for="evNote">할 일·준비물</label><textarea id="evNote" class="short" placeholder="예: 8시 30분까지 방송실 모이기, 대본 출력해 오기"></textarea></div>
+      <div class="field" id="evRecordField">
+        <label for="evRecord"><i class="ph ph-notebook"></i>기록 (끝나고 어떻게 됐나요?)</label>
+        <textarea id="evRecord" class="short" placeholder="예: 마이크 소리가 작아서 볼륨을 올렸어요. 다음엔 5분 일찍 모여요."></textarea>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn-danger hidden" id="btnDeleteEvent"><i class="ph ph-trash"></i>삭제</button>
+        <span class="grow"></span>
+        <button class="btn-primary" type="submit" id="btnSaveEvent">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 비밀번호 바꾸기 창 -->
+  <dialog id="passwordDialog">
+    <form id="passwordForm">
+      <div class="dialog-head"><h3><i class="ph ph-key"></i>비밀번호 바꾸기</h3><button type="button" class="btn-ghost btn-sm" id="btnClosePassword">닫기</button></div>
+      <p class="notice notice-warn hidden" id="mustChangeNotice">처음 들어왔어요! 선생님이 알려 준 임시 비밀번호를 나만 아는 비밀번호로 바꿔 주세요.</p>
+      <div class="field"><label for="pwCurrent">지금 비밀번호</label><input id="pwCurrent" type="password" autocomplete="current-password" required></div>
+      <div class="field"><label for="pwNext">새 비밀번호 (4글자 이상)</label><input id="pwNext" type="password" autocomplete="new-password" minlength="4" required></div>
+      <div class="field"><label for="pwNext2">새 비밀번호 한 번 더</label><input id="pwNext2" type="password" autocomplete="new-password" minlength="4" required></div>
+      <div class="dialog-actions"><span class="grow"></span><button class="btn-primary" type="submit">바꾸기</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

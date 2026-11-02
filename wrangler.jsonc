@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "broadcasting-script-helper",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+
+  // 화면 파일(public 폴더). /api/* 요청만 Worker(src/index.js)가 처리한다.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // 대본 저장용 데이터베이스. 배포 전 `npx wrangler d1 create broadcasting-db`로 만든 뒤
+  // 출력된 database_id를 아래에 붙여넣는다.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "broadcasting-db",
+      "database_id": "d9f7d9c9-188f-4ea0-96b5-ee5b65f5568c"
+    }
+  ],
+
+  // 공개해도 되는 설정값. 이 파일은 공개 저장소에 올라가므로 비밀값은 여기에 쓰지 않는다.
+  // 비밀값은 `npx wrangler secret put 이름`으로 Cloudflare에만 넣는다:
+  //   GEMINI_API_KEY, TEACHER_PASSWORD, SESSION_SECRET,
+  //   PLAN_SHEET_ID (학교 주간계획 구글 시트 ID. 교직원 정보가 있는 시트라 비밀값으로 둔다)
+  "vars": {
+    "SCHOOL_NAME": "삼호중앙초등학교",
+    "GEMINI_MODEL": "gemini-3.8-flash"
+  }
+}

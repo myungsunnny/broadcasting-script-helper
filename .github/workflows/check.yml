@@ -1,0 +1,32 @@
+# 자동 검사: 브랜치에 올리거나 변경 요청(PR)을 열 때마다 코드에 문제가 없는지 확인한다.
+# 배포는 하지 않는다. (배포는 deploy.yml에서, 관리자 승인 뒤에만)
+name: 자동 검사
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+jobs:
+  check:
+    name: 코드 검사
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 패키지 설치
+        run: npm ci
+
+      - name: 자바스크립트 문법 검사
+        run: |
+          for f in src/*.js public/app.js; do
+            node --check "$f"
+          done
+
+      - name: 서버 코드 묶기 시험 (실제 배포는 하지 않음)
+        run: npx wrangler deploy --dry-run --outdir dist
