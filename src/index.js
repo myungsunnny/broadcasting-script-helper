@@ -7,6 +7,7 @@ import { generateSection, SECTIONS } from './ai.js';
 import { getNextWeekEvents } from './weekly-plan.js';
 import { getSpecialTopics } from './commemorations.js';
 import { isValidDate, nextFriday, nowKST, todayKST } from './dates.js';
+import { getHome } from './home.js';
 import { CalendarError, listCalendar, upcomingEvents, createEvent, updateEvent, deleteEvent, listMembers } from './calendar.js';
 
 const STATUSES = ['작성중', '검토요청', '완료'];
@@ -160,6 +161,9 @@ async function handleApi(request, env, url) {
   }
   // 임시 비밀번호로 들어온 학생은 비밀번호를 바꾸기 전까지 다른 기능을 쓸 수 없다.
   if (user.mustChange) throw new HttpError(403, '먼저 내 비밀번호로 바꿔 주세요.');
+
+  // 홈(첫 화면) 묶음: 이번 주 대본, 내 할 일, 다가오는 일정, 공지, (선생님) 검토 기다리는 대본
+  if (pathname === '/api/home' && method === 'GET') return json(await getHome(env, user));
 
   if (pathname.startsWith('/api/users')) {
     if (user.role !== 'teacher') throw new HttpError(403, '학생 계정 관리는 선생님만 할 수 있어요.');

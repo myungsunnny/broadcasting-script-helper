@@ -18,3 +18,6 @@
 - source_spec: `_bmad-output/specs/spec-club-site/stories/1-menu-overhaul.md`
   summary: 화면이 바뀔 때 화면 읽기 프로그램에 알리지 않고, 브라우저 탭 제목도 화면마다 바뀌지 않는다.
   evidence: `showOnly()`는 숨김만 바꾸고 `document.title`은 항상 "방송부 · 학교이름"이다. 이번 스토리 전부터 그랬다.
+- source_spec: `_bmad-output/specs/spec-club-site/stories/2-home-dashboard.md`
+  summary: 홈의 이번 주 버튼이 홈 응답을 기다렸다가 이동하고, 불러오기에 실패하면 새 대본을 만들지 않는지 자동으로 확인하는 화면 테스트가 없다.
+  evidence: 저장소에 브라우저(화면) 테스트 도구가 없다. 서버 쪽 `thisWeek`는 `test/home.test.js`가 확인하지만 `public/app.js`의 `btnThisWeek` 처리기는 사람이 직접 눌러 확인한다.

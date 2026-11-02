@@ -12,7 +12,7 @@ const QUICK_ASKS = ['더 짧게', '더 길게', '더 쉽게', '더 재미있게'
 const META_FIELDS = ['broadcast_date', 'title', 'status', 'memo'];
 const CHARS_PER_SECOND = 5; // 초등 아나운서 낭독 속도(대략)
 
-const state = { user: null, config: null, scripts: [], current: null, dirty: false, historyRow: null, step: 1, tab: 'greeting', editSeq: 0 };
+const state = { user: null, config: null, scripts: [], home: null, homeLoaded: false, homeReq: null, homeSeq: 0, current: null, dirty: false, historyRow: null, step: 1, tab: 'greeting', editSeq: 0 };
 
 /* ───────────── 공통 도구 ───────────── */
 
@@ -115,7 +115,11 @@ async function init() {
 
 function setUser(user) {
   state.user = user;
-  state.scriptsLoaded = false;
+  // 다른 사람으로 바뀌면 받던 홈 응답은 버린다.
+  state.homeSeq++;
+  state.home = null;
+  state.homeLoaded = false;
+  state.homeReq = null;
   $('userBox').classList.toggle('hidden', !user);
   toggleUserMenu(false);
   if (user) $('userName').textContent = `${user.name}${user.role === 'teacher' ? ' 선생님' : ''}`;
@@ -177,15 +181,36 @@ function route() {
 
 /* ───────────── 홈 · 게시판 · 알림 ───────────── */
 
-/** 대본 목록을 받아 둔다. (홈의 이번 주 버튼과 대본 목록이 함께 쓴다) */
+/** 대본 목록을 받아 둔다. (대본 목록 화면용) */
 async function loadScripts() {
   state.scripts = await api('/api/scripts');
-  state.scriptsLoaded = true;
   return state.scripts;
 }
 
+/**
+ * 홈 묶음(/api/home)을 받는다. 늦게 온 예전 응답은 무시하고(요청 순번),
+ * 실패하면 토스트 + 각 카드에 "불러오지 못했어요". 돌려주는 약속은 이번 주 버튼이 기다릴 때 쓴다.
+ */
+function loadHome() {
+  const seq = ++state.homeSeq;
+  state.homeLoaded = false;
+  const req = api('/api/home');
+  state.homeReq = req;
+  req.then(data => {
+    if (seq !== state.homeSeq) return;
+    state.home = data;
+    state.homeLoaded = true;
+    renderHome();
+  }, err => {
+    if (seq !== state.homeSeq) return;
+    state.homeReq = null; // 다음에 누르면 새로 받는다
+    toast('홈을 불러오지 못했어요: ' + err.message);
+    renderHomeError();
+  });
+  return req;
+}
+
 async function showHome() {
-  state.scriptsLoaded = false; // 새 목록을 받기 전에는 이번 주 버튼이 기다리게 한다
   showOnly('homeView');
   setMenu('home');
   const u = state.user;
@@ -196,13 +221,96 @@ async function showHome() {
   let seen = false;
   try { seen = !!localStorage.getItem(HELP_SEEN); } catch {}
   $('firstHelp').classList.toggle('hidden', seen || u.role === 'teacher');
-  $('upcomingCard').classList.remove('hidden');
+  // 선생님: 검토 기다리는 대본 / 학생: 내 할 일
+  const isTeacher = u.role === 'teacher';
+  $('reviewCard').classList.toggle('hidden', !isTeacher);
+  $('todoCard').classList.toggle('hidden', isTeacher);
+  state.home = null;
   renderThisWeek();
-  loadUpcoming();
-  try {
-    await loadScripts();
-    renderThisWeek();
-  } catch (err) { toast('대본 목록을 불러오지 못했어요: ' + err.message); }
+  ['reviewList', 'todoList', 'noticeList', 'upcomingList'].forEach(id => { $(id).innerHTML = skeleton(2, '불러오는 중…'); });
+  ['reviewCount', 'todoCount'].forEach(id => $(id).classList.add('hidden'));
+  try { await loadHome(); } catch { /* loadHome이 알린다 */ }
+}
+
+/** 홈 목록의 한 줄: 날짜 칸 + 제목·설명 + 오른쪽 칩. query로 실제 주소와 앱 안 이동을 함께 건다. */
+function homeRow({ query, date, title, sub, chip = '' }) {
+  return `
+    <a class="upcoming-item" href="/${esc(query)}" data-go="${esc(query)}">
+      <span class="up-date"><b>${Number(date.slice(8))}</b><span>${'일월화수목금토'[parseYmd(date).getDay()]}</span></span>
+      <span class="grow"><b>${esc(title)}</b>${sub ? `<span class="muted small">${esc(sub)}</span>` : ''}</span>
+      ${chip ? `<span class="up-chips">${chip}</span>` : ''}
+    </a>`;
+}
+
+/** 오늘·내일은 말로, 나머지는 '11월 6일' */
+function homeDay(date) {
+  const today = state.home?.today || localToday();
+  const diff = Math.round((parseYmd(date) - parseYmd(today)) / 86400000);
+  return diff === 0 ? '오늘' : diff === 1 ? '내일' : `${Number(date.slice(5, 7))}월 ${Number(date.slice(8))}일`;
+}
+
+const scriptQuery = id => '?id=' + encodeURIComponent(id);
+const statusBadge = s => `<span class="badge badge-${esc(s)}">${esc(s)}</span>`;
+
+function setCount(id, n, label) {
+  $(id).textContent = n;
+  $(id).setAttribute('aria-label', `${label} ${n}개`);
+  $(id).classList.toggle('hidden', !n);
+}
+
+function renderHome() {
+  const h = state.home;
+  // 창을 금요일 넘어 열어 두었어도 ?new 기본 방송일이 서버의 이번 주 금요일과 같게
+  state.config.nextFriday = h.thisWeek.date;
+  renderThisWeek();
+
+  if (h.reviewQueue) {
+    setCount('reviewCount', h.reviewQueue.length, '검토 기다리는 대본');
+    $('reviewList').innerHTML = h.reviewQueue.length ? h.reviewQueue.map(s => homeRow({
+      query: scriptQuery(s.id),
+      date: s.broadcast_date,
+      title: s.title || `${md(s.broadcast_date)} 대본`,
+      sub: `${homeDay(s.broadcast_date)} 방송 · ${s.announcers || s.created_by || '-'}`,
+      chip: statusBadge(s.status)
+    })).join('')
+      : '<div class="muted small up-empty">검토를 기다리는 대본이 없어요.</div>';
+  }
+
+  setCount('todoCount', h.todo.length, '내 할 일');
+  $('todoList').innerHTML = h.todo.length ? h.todo.map(t => t.kind === 'script'
+    ? homeRow({
+      query: scriptQuery(t.id),
+      date: t.date,
+      title: `${md(t.date)} 대본 마저 쓰기`,
+      sub: `${homeDay(t.date)} 방송${t.title ? ' · ' + t.title : ''}`,
+      chip: statusBadge(t.status)
+    })
+    : homeRow({
+      query: `?calendar&date=${t.date}`,
+      date: t.date,
+      title: `${homeDay(t.date)}${t.time ? ' ' + t.time : ''} ${t.title}`,
+      sub: t.members.length ? `함께: ${t.members.join(', ')}` : '',
+      chip: `<span class="cat cat-${esc(t.category)}">${esc(t.category)}</span>`
+    })).join('')
+    : `<div class="muted small up-empty">오늘은 할 일이 없어요. <a href="/?scripts" class="link-btn" data-go="?scripts">대본 목록을 둘러볼까요?</a></div>`;
+
+  // 공지는 게시판(스토리 3)이 열리면 채운다.
+  $('noticeList').innerHTML = h.notices.length ? '' :
+    '<div class="muted small up-empty">공지는 게시판이 열리면 여기에 보여요.</div>';
+
+  $('upcomingList').innerHTML = h.upcoming.length ? h.upcoming.map(e => homeRow({
+    query: `?calendar&date=${e.date}`,
+    date: e.date,
+    title: e.title,
+    sub: `${homeDay(e.date)}${e.time ? ' ' + e.time : ''}${e.members.length ? ', ' + e.members.join(', ') : ''}`,
+    chip: `${e.hasScript ? `<span class="cat cat-script">${icon('microphone')}대본</span>` : ''}<span class="cat cat-${esc(e.category)}">${esc(e.category)}</span>`
+  })).join('')
+    : '<div class="muted small up-empty">다가오는 일정이 없어요. 캘린더에서 연습이나 회의 일정을 넣어 보세요.</div>';
+}
+
+function renderHomeError() {
+  const msg = '<div class="muted small up-empty">불러오지 못했어요. 잠시 뒤 다시 열어 보세요.</div>';
+  ['reviewList', 'todoList', 'noticeList', 'upcomingList'].forEach(id => { $(id).innerHTML = msg; });
 }
 
 function showBoard() {
@@ -433,23 +541,6 @@ async function removeEvent() {
   } catch (err) { alert(err.message); }
 }
 
-/** 대본 목록 화면의 '다가오는 방송부 일정' */
-async function loadUpcoming() {
-  try {
-    const list = await api('/api/calendar/upcoming');
-    const today = localToday();
-    $('upcomingList').innerHTML = list.length ? list.map(e => `
-      <a class="upcoming-item" href="/?calendar&date=${e.date}" data-go="?calendar&date=${e.date}">
-        <span class="up-date"><b>${Number(e.date.slice(8))}</b><span>${'일월화수목금토'[parseYmd(e.date).getDay()]}</span></span>
-        <span class="grow"><b>${esc(e.title)}</b><span class="muted small">${e.date === today ? '오늘' : `${Number(e.date.slice(5, 7))}월 ${Number(e.date.slice(8))}일`}${e.time ? ' ' + esc(e.time) : ''}${e.members.length ? ', ' + esc(e.members.join(', ')) : ''}</span></span>
-        <span class="cat cat-${esc(e.category)}">${esc(e.category)}</span>
-      </a>`).join('')
-      : `<div class="muted small up-empty">다가오는 일정이 없어요. 캘린더에서 연습이나 회의 일정을 넣어 보세요.</div>`;
-  } catch {
-    $('upcomingCard').classList.add('hidden');
-  }
-}
-
 /* ───────────── 사용법 ───────────── */
 
 const HELP_SEEN = 'helpSeen';
@@ -587,13 +678,13 @@ async function showList() {
   } catch (err) { $('listBox').innerHTML = `<div class="card">${esc(err.message)}</div>`; }
 }
 
-/** 이번 주(다음 금요일) 대본이 이미 있으면 그 대본 */
-const thisWeekScript = () => state.scripts.find(s => s.broadcast_date === state.config.nextFriday);
+/** 이번 주(다음 금요일) 대본이 이미 있으면 그 대본 요약 (홈 묶음 기준) */
+const thisWeekScript = () => state.home?.thisWeek?.script || null;
 
 /** 홈의 큰 빨강 '이번 주 대본' 버튼 문구 */
 function renderThisWeek() {
   const tw = thisWeekScript();
-  const date = state.config.nextFriday;
+  const date = state.home?.thisWeek?.date || state.config.nextFriday;
   $('thisWeekTitle').textContent = tw ? '이번 주 대본 이어서 만들기' : '이번 주 대본 만들기';
   $('thisWeekSub').textContent = tw
     ? `${md(date)}(금) 방송 · 지금 상태: ${tw.status}`
@@ -1360,9 +1451,11 @@ function bindEvents() {
   $('search').addEventListener('input', renderList);
   $('statusFilter').addEventListener('change', renderList);
   $('btnThisWeek').addEventListener('click', async () => {
-    // 목록을 아직 못 받았으면 받고 나서 고른다. (이번 주 대본을 두 번 만들지 않도록)
-    if (!state.scriptsLoaded) {
-      try { await loadScripts(); } catch (err) { return toast('대본 목록을 불러오지 못했어요: ' + err.message); }
+    // 홈 묶음을 아직 못 받았으면 (받는 중이면 그 응답을, 실패했으면 새로) 받고 나서 고른다.
+    // 실패하면 토스트만 보이고 새로 만들지 않는다. (이번 주 대본을 두 번 만들지 않도록)
+    if (!state.homeLoaded) {
+      try { await (state.homeReq || loadHome()); } catch { return; }
+      if (!state.homeLoaded || $('homeView').classList.contains('hidden')) return;
     }
     const tw = thisWeekScript();
     navigate(tw ? '?id=' + encodeURIComponent(tw.id) : '?new');

@@ -28,5 +28,8 @@ jobs:
             node --check "$f"
           done
 
+      - name: 단위 시험
+        run: npm test
+
       - name: 서버 코드 묶기 시험 (실제 배포는 하지 않음)
         run: npx wrangler deploy --dry-run --outdir dist
