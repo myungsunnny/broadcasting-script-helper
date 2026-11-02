@@ -1,9 +1,10 @@
 // 홈(첫 화면) 묶음 데이터
-// 이번 주 대본 요약, 내 할 일, 다가오는 일정, 새 공지(게시판이 열리기 전에는 빈 목록),
+// 이번 주 대본 요약, 내 할 일, 다가오는 일정, 새 공지(고정 공지 + 최근 공지 3개),
 // 선생님이면 검토 기다리는 대본을 한 번에 돌려준다.
 
 import { addDays, nextFriday, todayKST } from './dates.js';
 import { toEvent, upcomingStatement } from './calendar.js';
+import { noticeStatements, toNotices } from './board.js';
 
 const UPCOMING_LIMIT = 5;
 const TODO_LIMIT = 5;
@@ -31,7 +32,9 @@ export async function getHome(env, user) {
   const name = String(user.name || '').trim();
 
   const upcoming = upcomingStatement(env, today, UPCOMING_LIMIT);
+  const notices = noticeStatements(env, user);
   const statements = [
+    ...notices,
     env.DB.prepare('SELECT id, broadcast_date, title, status FROM scripts WHERE broadcast_date = ? ORDER BY updated_at DESC LIMIT 1')
       .bind(friday),
     upcoming,
@@ -57,7 +60,9 @@ export async function getHome(env, user) {
     );
   }
 
-  const [weekRes, upcomingRes, scriptDatesRes, ...rest] = await env.DB.batch(statements);
+  const results = await env.DB.batch(statements);
+  const noticeResults = results.slice(0, notices.length);
+  const [weekRes, upcomingRes, scriptDatesRes, ...rest] = results.slice(notices.length);
 
   const week = weekRes.results[0];
   const scriptDates = new Set(scriptDatesRes.results.map(r => r.date));
@@ -66,7 +71,7 @@ export async function getHome(env, user) {
     thisWeek: { date: friday, script: week ? { id: week.id, title: week.title, status: week.status } : null },
     todo: [],
     upcoming: upcomingRes.results.map(toEvent).map(e => ({ ...e, hasScript: scriptDates.has(e.date) })),
-    notices: [] // 게시판(스토리 3)이 열리면 채운다.
+    notices: toNotices(user, noticeResults) // 고정 공지 먼저, 그다음 고정 아닌 최근 공지 3개 (메모는 넣지 않음)
   };
 
   if (isTeacher) {
@@ -83,10 +88,15 @@ export async function getHome(env, user) {
     members: e.members.filter(m => String(m).trim() !== name)
   }));
   // 날짜 빠른 순. 같은 날이면 대본 먼저, 일정은 하루 종일 → 시간 순.
-  home.todo = [...scripts, ...events].sort((a, b) =>
+  const dated = [...scripts, ...events].sort((a, b) =>
     a.date.localeCompare(b.date) ||
     (a.kind === b.kind ? 0 : a.kind === 'script' ? -1 : 1) ||
     a.time.localeCompare(b.time)
-  ).slice(0, TODO_LIMIT);
+  );
+  // 안 읽은 고정 공지는 대본·일정 뒤에 붙이고, 전체 5개까지.
+  const unreadPinned = home.notices.filter(n => n.pinned && n.unread).map(n => ({
+    kind: 'notice', id: n.id, title: n.title, date: n.created_at.slice(0, 10)
+  }));
+  home.todo = [...dated, ...unreadPinned].slice(0, TODO_LIMIT);
   return home;
 }

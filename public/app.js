@@ -38,6 +38,9 @@ async function api(path, options = {}) {
 
 function toast(msg) {
   const t = $('toast');
+  // 창(dialog)이 열려 있으면 그 안에 띄워야 어두운 배경 위로 보인다.
+  const host = document.querySelector('dialog[open]') || document.body;
+  if (t.parentElement !== host) host.appendChild(t);
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._timer);
@@ -169,7 +172,7 @@ function route() {
   }
   if (params.has('accounts') && state.user.role === 'teacher') return showAccounts();
   if (params.has('calendar')) { setMenu('calendar'); return showCalendar(params.get('date')); }
-  if (params.has('board')) return showBoard();
+  if (params.has('board')) return showBoard(params.get('post'));
   if (params.has('inbox')) return showInbox();
   if (params.has('scripts')) return showList();
   // 대본 편집·방송용 보기는 '대본' 메뉴에 속한다.
@@ -225,6 +228,7 @@ async function showHome() {
   const isTeacher = u.role === 'teacher';
   $('reviewCard').classList.toggle('hidden', !isTeacher);
   $('todoCard').classList.toggle('hidden', isTeacher);
+  $('btnHomeNotice').classList.toggle('hidden', !isTeacher);
   state.home = null;
   renderThisWeek();
   ['reviewList', 'todoList', 'noticeList', 'upcomingList'].forEach(id => { $(id).innerHTML = skeleton(2, '불러오는 중…'); });
@@ -277,7 +281,15 @@ function renderHome() {
   }
 
   setCount('todoCount', h.todo.length, '내 할 일');
-  $('todoList').innerHTML = h.todo.length ? h.todo.map(t => t.kind === 'script'
+  $('todoList').innerHTML = h.todo.length ? h.todo.map(t => t.kind === 'notice'
+    ? homeRow({
+      query: postQuery(t.id),
+      date: t.date,
+      title: `공지 읽기: ${t.title}`,
+      sub: '고정 공지를 아직 안 읽었어요',
+      chip: '<span class="badge badge-new">새</span>'
+    })
+    : t.kind === 'script'
     ? homeRow({
       query: scriptQuery(t.id),
       date: t.date,
@@ -294,9 +306,15 @@ function renderHome() {
     })).join('')
     : `<div class="muted small up-empty">오늘은 할 일이 없어요. <a href="/?scripts" class="link-btn" data-go="?scripts">대본 목록을 둘러볼까요?</a></div>`;
 
-  // 공지는 게시판(스토리 3)이 열리면 채운다.
-  $('noticeList').innerHTML = h.notices.length ? '' :
-    '<div class="muted small up-empty">공지는 게시판이 열리면 여기에 보여요.</div>';
+  // 새 공지: 고정 공지 먼저, 그다음 최근 공지. 학생은 안 읽은 공지에 '새', 선생님은 읽음 수.
+  $('noticeList').innerHTML = h.notices.length ? h.notices.map(n => homeRow({
+    query: postQuery(n.id),
+    date: n.created_at.slice(0, 10),
+    title: n.title,
+    sub: `${n.pinned ? '고정 · ' : ''}${n.created_by} · ${homeDay(n.created_at.slice(0, 10))}`,
+    chip: noticeChip(n)
+  })).join('')
+    : `<div class="muted small up-empty">${state.user.role === 'teacher' ? '아직 공지가 없어요. 공지 쓰기로 방송부에 알려 보세요.' : '아직 공지가 없어요.'}</div>`;
 
   $('upcomingList').innerHTML = h.upcoming.length ? h.upcoming.map(e => homeRow({
     query: `?calendar&date=${e.date}`,
@@ -313,9 +331,275 @@ function renderHomeError() {
   ['reviewList', 'todoList', 'noticeList', 'upcomingList'].forEach(id => { $(id).innerHTML = msg; });
 }
 
-function showBoard() {
+/* ───────────── 게시판: 선생님 공지 + 부원 메모 ─────────────
+   목록에서 글을 누르면 그 자리에서 펼쳐지고 주소가 ?board&post=<id>로 바뀐다.
+   학생이 공지를 펼치면 읽음으로 기록하고, 선생님은 공지마다 읽은/안 읽은 부원을 본다.
+   고치기·지우기 버튼은 서버가 알려 준 canEdit/canDelete대로만 보인다(서버도 다시 확인). */
+
+const postQuery = id => '?board&post=' + encodeURIComponent(id);
+/** 공지 옆 칩: 선생님은 읽음 수, 학생은 안 읽었으면 '새' */
+const noticeChip = n => n.readCount !== undefined
+  ? `<span class="badge" aria-label="읽음 ${n.readCount}명, 전체 ${n.total}명">읽음 ${n.readCount}/${n.total}</span>`
+  : n.unread ? '<span class="badge badge-new">새</span>' : '';
+
+state.board = { kind: '', posts: [], more: false, failed: false, extra: null, open: null, readsOpen: null, reads: {}, seq: 0, editing: null, newKind: 'memo' };
+
+const allPosts = () => state.board.extra ? [state.board.extra, ...state.board.posts] : state.board.posts;
+const findPost = id => allPosts().find(p => p.id === id);
+const boardVisible = () => !$('boardView').classList.contains('hidden');
+
+async function showBoard(postId) {
   showOnly('boardView');
   setMenu('board');
+  const isTeacher = state.user.role === 'teacher';
+  $('btnNewNotice').classList.toggle('hidden', !isTeacher);
+  // 강조 버튼은 하나만: 선생님은 '공지 쓰기', 학생은 '메모 쓰기'
+  $('btnNewMemo').className = isTeacher ? 'btn-ghost' : 'btn-primary';
+  const b = state.board;
+  b.open = postId || null;
+  b.extra = null;
+  b.readsOpen = null;
+  if (postId) b.kind = ''; // 주소로 연 글은 '전체'에서 찾는다
+  renderBoardTabs();
+  await loadBoard();
+  if (postId && boardVisible()) await revealPost(postId);
+}
+
+function renderBoardTabs() {
+  document.querySelectorAll('#boardTabs [data-kind]').forEach(btn => {
+    const on = btn.dataset.kind === state.board.kind;
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on);
+  });
+}
+
+/** 목록을 받는다. append면 '더 보기'(마지막 고정 아닌 글보다 오래된 20개) */
+async function loadBoard(append = false) {
+  const b = state.board;
+  const seq = ++b.seq;
+  const params = new URLSearchParams();
+  if (b.kind) params.set('kind', b.kind);
+  if (append) {
+    const last = b.posts.filter(p => !p.pinned).at(-1);
+    if (!last) return;
+    params.set('before', last.id);
+  } else {
+    $('postList').innerHTML = skeleton(3, '글을 불러오는 중…');
+    $('btnMorePosts').classList.add('hidden');
+  }
+  $('btnMorePosts').disabled = true;
+  try {
+    const r = await api('/api/posts' + (params.toString() ? '?' + params : ''));
+    if (seq !== b.seq) return;
+    b.posts = append ? [...b.posts, ...r.posts.filter(p => !b.posts.some(x => x.id === p.id))] : r.posts;
+    b.more = r.more;
+    b.failed = false;
+    if (b.extra && b.posts.some(p => p.id === b.extra.id)) b.extra = null;
+  } catch (err) {
+    if (seq !== b.seq) return;
+    toast('게시판을 불러오지 못했어요: ' + err.message);
+    if (!append) { b.posts = []; b.more = false; b.failed = true; }
+  } finally {
+    if (seq === b.seq) $('btnMorePosts').disabled = false;
+  }
+  renderBoard();
+}
+
+/** 주소로 연 글: 목록에 없으면 하나만 받아 맨 위에 보여 준다. 없는 글이면 토스트 후 ?board */
+async function revealPost(id) {
+  const b = state.board;
+  if (!findPost(id)) {
+    try {
+      const post = await api('/api/posts/' + encodeURIComponent(id));
+      if (b.open !== id || !boardVisible()) return;
+      b.extra = post;
+    } catch (err) {
+      if (b.open !== id) return;
+      toast(err.status === 404 ? '글을 찾을 수 없어요. 지워졌을 수 있어요.' : '글을 불러오지 못했어요: ' + err.message);
+      b.open = null;
+      history.replaceState(null, '', '/?board');
+      renderBoard();
+      return;
+    }
+  }
+  renderBoard();
+  markPostRead(id);
+  document.querySelector(`#postList [data-post="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+function renderBoard() {
+  const b = state.board;
+  $('btnMorePosts').classList.toggle('hidden', !b.more);
+  const list = allPosts();
+  if (!list.length) {
+    $('postList').innerHTML = b.failed
+      ? '<div class="card empty-card"><p class="muted">게시판을 불러오지 못했어요. 잠시 뒤 다시 열어 보세요.</p></div>'
+      : `<div class="card empty-card"><span class="login-mark">${icon('push-pin', true)}</span>
+          <p class="muted">${b.kind === 'notice' ? '아직 공지가 없어요.'
+            : b.kind === 'memo' ? '아직 메모가 없어요. 방송부에 알리고 싶은 것을 메모로 남겨 보세요.'
+            : '아직 글이 없어요. 방송부에 알리고 싶은 것을 메모로 남겨 보세요.'}</p></div>`;
+    return;
+  }
+  $('postList').innerHTML = list.map(renderPost).join('');
+}
+
+function renderPost(p) {
+  const b = state.board;
+  const open = b.open === p.id;
+  const id = esc(p.id);
+  const isNotice = p.kind === 'notice';
+  const teacherView = p.readCount !== undefined;
+  const author = `${p.created_by}${p.created_by_uid ? '' : ' 선생님'}`;
+  const head = `
+    <button type="button" class="post-row" data-toggle="${id}" aria-expanded="${open}">
+      ${p.pinned ? `<span class="post-pin" title="맨 위에 고정">${icon('push-pin', true)}<span class="sr-only">고정</span></span>` : ''}
+      <span class="cat cat-${isNotice ? 'notice' : 'memo'}">${isNotice ? '공지' : '메모'}</span>
+      <span class="grow post-head"><b class="post-title">${esc(p.title)}</b><span class="muted small">${esc(author)} · ${md(p.created_at.slice(0, 10))}</span></span>
+      ${isNotice ? noticeChip(p) : ''}
+      <span class="post-caret">${icon(open ? 'caret-up' : 'caret-down')}</span>
+    </button>`;
+  if (!open) return `<article class="post-item${p.pinned ? ' pinned' : ''}" data-post="${id}">${head}</article>`;
+  const edited = p.updated_at !== p.created_at;
+  return `
+  <article class="post-item open${p.pinned ? ' pinned' : ''}" data-post="${id}">
+    ${head}
+    <div class="post-body">
+      ${p.body.trim() ? `<p class="post-text">${esc(p.body)}</p>` : '<p class="muted small">내용 없이 제목만 있어요.</p>'}
+      <p class="muted small post-meta">${esc(p.created_at.slice(0, 16))}${edited ? ` · ${esc(p.updated_by)}님이 ${esc(p.updated_at.slice(5, 16))}에 고침` : ''}</p>
+      ${teacherView || p.canEdit || p.canDelete ? `<div class="post-actions">
+        ${teacherView ? `<button type="button" class="btn-soft btn-sm" data-reads="${id}" aria-expanded="${b.readsOpen === p.id}">${icon('users-three')}읽음 ${p.readCount} / ${p.total}</button>` : ''}
+        <span class="grow"></span>
+        ${p.canEdit ? `<button type="button" class="btn-ghost btn-sm" data-edit-post="${id}">${icon('pencil-simple')}고치기</button>` : ''}
+        ${p.canDelete ? `<button type="button" class="btn-danger btn-sm" data-delete-post="${id}">${icon('trash')}지우기</button>` : ''}
+      </div>` : ''}
+      ${teacherView && b.readsOpen === p.id ? renderReads(p.id) : ''}
+    </div>
+  </article>`;
+}
+
+/** 선생님 읽음 명단: 읽은 부원 / 아직 안 읽은 부원 이름 칩 두 줄 */
+function renderReads(id) {
+  const r = state.board.reads[id];
+  if (!r) return `<div class="post-reads" aria-live="polite">${skeleton(1, '명단을 불러오는 중…')}</div>`;
+  if (r.error) return `<div class="post-reads muted small" aria-live="polite">명단을 불러오지 못했어요: ${esc(r.error)}</div>`;
+  const tags = names => names.length
+    ? names.map(n => `<span class="member-tag">${esc(n)}</span>`).join('')
+    : '<span class="muted small">없어요</span>';
+  return `<div class="post-reads" aria-live="polite">
+    <div class="reads-row"><b class="small">읽은 부원 ${r.read.length}</b><div class="reads-tags">${tags(r.read)}</div></div>
+    <div class="reads-row"><b class="small">아직 안 읽은 부원 ${r.unread.length}</b><div class="reads-tags">${tags(r.unread)}</div></div>
+  </div>`;
+}
+
+function togglePost(id) {
+  const b = state.board;
+  b.open = b.open === id ? null : id;
+  b.readsOpen = null;
+  history.replaceState(null, '', '/' + (b.open ? postQuery(b.open) : '?board'));
+  renderBoard();
+  if (b.open) markPostRead(b.open);
+}
+
+/** 학생이 안 읽은 공지를 펼치면 읽음 기록 ('새' 칩은 바로 지운다) */
+async function markPostRead(id) {
+  const p = findPost(id);
+  if (!p || p.kind !== 'notice' || !p.unread || state.user.role === 'teacher') return;
+  p.unread = false;
+  renderBoard();
+  try { await api(`/api/posts/${encodeURIComponent(id)}/read`, { method: 'POST' }); }
+  catch (err) { p.unread = true; renderBoard(); toast('읽음 기록을 남기지 못했어요: ' + err.message); }
+}
+
+async function toggleReads(id) {
+  const b = state.board;
+  b.readsOpen = b.readsOpen === id ? null : id;
+  if (!b.readsOpen) return renderBoard();
+  b.reads[id] = null; // 열 때마다 새로 받는다
+  renderBoard();
+  try {
+    const r = await api(`/api/posts/${encodeURIComponent(id)}/reads`);
+    b.reads[id] = r;
+    const p = findPost(id);
+    if (p) { p.readCount = r.read.length; p.total = r.read.length + r.unread.length; }
+  } catch (err) {
+    b.reads[id] = { error: err.message };
+  }
+  if (boardVisible()) renderBoard();
+}
+
+/* ── 글 쓰기·고치기 창 ── */
+
+function updatePostCount() {
+  $('postBodyCount').textContent = `${$('postBody').value.length} / 2000`;
+}
+
+function openPostDialog(kind, post = null) {
+  const b = state.board;
+  b.editing = post;
+  b.newKind = post ? post.kind : kind;
+  const isNotice = b.newKind === 'notice';
+  $('postDialogTitle').innerHTML = post
+    ? icon('pencil-simple') + (isNotice ? '공지 고치기' : '메모 고치기')
+    : isNotice ? icon('megaphone') + '공지 쓰기' : icon('note-pencil') + '메모 쓰기';
+  $('postTitle').value = post?.title || '';
+  $('postBody').value = post?.body || '';
+  $('postPinRow').classList.toggle('hidden', !isNotice);
+  $('postPinned').checked = !!post?.pinned;
+  $('btnSavePost').textContent = post ? '고치기' : '올리기';
+  updatePostCount();
+  $('postDialog').showModal();
+  $('postTitle').focus();
+}
+
+async function savePost(e) {
+  e.preventDefault();
+  const b = state.board;
+  const editing = b.editing;
+  const body = { title: $('postTitle').value.trim(), body: $('postBody').value, pinned: $('postPinned').checked };
+  if (!body.title) return $('postTitle').focus();
+  if (!editing) body.kind = b.newKind;
+  $('btnSavePost').disabled = true;
+  try {
+    const saved = await api(editing ? '/api/posts/' + encodeURIComponent(editing.id) : '/api/posts', { method: editing ? 'PUT' : 'POST', body });
+    $('postDialog').close();
+    toast(editing ? '글을 고쳤어요.' : saved.kind === 'notice' ? '공지를 올렸어요.' : '메모를 올렸어요.');
+    if (boardVisible()) {
+      if (!editing && b.kind && b.kind !== saved.kind) { b.kind = ''; renderBoardTabs(); }
+      if (b.extra?.id === saved.id) b.extra = saved;
+      b.open = saved.id;
+      b.readsOpen = null;
+      history.replaceState(null, '', '/' + postQuery(saved.id));
+      await loadBoard();
+      // '더 보기'로 받은 글을 고쳤으면 첫 쪽에 없으니 맨 위에 따로 보여 준다.
+      if (!findPost(saved.id)) { b.extra = saved; renderBoard(); }
+    } else if (!$('homeView').classList.contains('hidden')) {
+      loadHome();
+    }
+  } catch (err) {
+    toast(err.message); // 창은 그대로 두어 고쳐서 다시 올릴 수 있게
+  } finally {
+    $('btnSavePost').disabled = false;
+  }
+}
+
+async function removePost(id) {
+  const b = state.board;
+  const p = findPost(id);
+  if (!p || !confirm(`'${p.title}' 글을 지울까요? 되돌릴 수 없어요.`)) return;
+  try {
+    await api('/api/posts/' + encodeURIComponent(id), { method: 'DELETE' });
+    toast('글을 지웠어요.');
+    if (b.open === id) { b.open = null; history.replaceState(null, '', '/?board'); }
+    if (b.extra?.id === id) b.extra = null;
+    await loadBoard();
+  } catch (err) {
+    toast(err.message);
+    if (err.status === 404) { // 다른 사람이 먼저 지웠으면 목록을 새로 받는다
+      if (b.open === id) { b.open = null; history.replaceState(null, '', '/?board'); }
+      if (b.extra?.id === id) b.extra = null;
+      await loadBoard();
+    }
+  }
 }
 
 function showInbox() {
@@ -1409,6 +1693,35 @@ function bindEvents() {
   $('eventForm').addEventListener('submit', saveEvent);
   $('btnCloseEvent').addEventListener('click', () => $('eventDialog').close());
   $('btnDeleteEvent').addEventListener('click', removeEvent);
+  // 게시판
+  $('boardTabs').addEventListener('click', e => {
+    const t = e.target.closest('[data-kind]');
+    if (!t || t.dataset.kind === state.board.kind) return;
+    Object.assign(state.board, { kind: t.dataset.kind, open: null, extra: null, readsOpen: null });
+    history.replaceState(null, '', '/?board');
+    renderBoardTabs();
+    loadBoard();
+  });
+  $('btnMorePosts').addEventListener('click', () => loadBoard(true));
+  $('btnNewMemo').addEventListener('click', () => openPostDialog('memo'));
+  $('btnNewNotice').addEventListener('click', () => openPostDialog('notice'));
+  $('btnHomeNotice').addEventListener('click', () => openPostDialog('notice'));
+  $('postList').addEventListener('click', e => {
+    const t = e.target.closest('[data-toggle], [data-reads], [data-edit-post], [data-delete-post]');
+    if (!t) return;
+    if (t.dataset.toggle) return togglePost(t.dataset.toggle);
+    if (t.dataset.reads) return toggleReads(t.dataset.reads);
+    if (t.dataset.editPost) { const p = findPost(t.dataset.editPost); if (p) openPostDialog(p.kind, p); return; }
+    if (t.dataset.deletePost) return removePost(t.dataset.deletePost);
+  });
+  $('postBody').addEventListener('input', updatePostCount);
+  $('postForm').addEventListener('submit', savePost);
+  $('btnClosePost').addEventListener('click', () => $('postDialog').close());
+  // 창 안으로 옮겨 띄운 토스트는 창이 닫히면 다시 본문으로 (닫힌 창 안에 갇히지 않게)
+  document.querySelectorAll('dialog').forEach(d => d.addEventListener('close', () => {
+    if ($('toast').parentElement === d) document.body.appendChild($('toast'));
+  }));
+
   $('btnHelpBack').addEventListener('click', leaveHelp);
   $('btnHelpStart').addEventListener('click', () => navigate(''));
   $('btnHideFirstHelp').addEventListener('click', markHelpSeen);
@@ -1520,7 +1833,7 @@ function bindEvents() {
       aiSection(e.target.id.replace('req-', ''));
     }
   });
-  document.querySelector('.seg').addEventListener('click', e => {
+  document.querySelector('.big-seg').addEventListener('click', e => {
     const b = e.target.closest('[data-count]');
     if (b) changeAnnouncerCount(b.dataset.count);
   });
