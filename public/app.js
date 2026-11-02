@@ -45,8 +45,35 @@ function toast(msg) {
 }
 
 function showOnly(id) {
-  ['loginView', 'listView', 'editView', 'readView', 'accountsView', 'helpView', 'calendarView'].forEach(v => $(v).classList.toggle('hidden', v !== id));
+  ['loginView', 'homeView', 'listView', 'boardView', 'inboxView', 'editView', 'readView', 'accountsView', 'helpView', 'calendarView'].forEach(v => $(v).classList.toggle('hidden', v !== id));
   window.scrollTo(0, 0);
+}
+
+/* ───────────── 메뉴 · 내 계정 목록 ───────────── */
+
+/** 지금 화면에 해당하는 메뉴를 빨강(넓은 화면은 밑줄, 좁은 화면은 채운 아이콘)으로 표시한다. key가 없으면 표시 없음 */
+function setMenu(key) {
+  document.querySelectorAll('#mainNav a[data-menu]').forEach(a => {
+    const on = a.dataset.menu === key;
+    a.classList.toggle('on', on);
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    const i = a.querySelector('i');
+    i.classList.toggle('ph-fill', on);
+    i.classList.toggle('ph', !on);
+  });
+}
+
+/** 로그인했고 비밀번호를 바꿀 필요가 없을 때만 메뉴를 보인다. */
+function syncNav() {
+  const show = !!state.user && !state.user.mustChange;
+  $('mainNav').classList.toggle('hidden', !show);
+  document.body.classList.toggle('has-nav', show);
+}
+
+function toggleUserMenu(open = $('userPop').classList.contains('hidden')) {
+  $('userPop').classList.toggle('hidden', !open);
+  $('btnUser').setAttribute('aria-expanded', open);
+  if (open) $('userPop').querySelector('.btn-menu:not(.hidden)')?.focus();
 }
 
 function navigate(query, replace = false) {
@@ -73,7 +100,7 @@ async function init() {
   const { user, config } = await api('/api/me');
   state.config = config;
   $('schoolName').textContent = config.school;
-  document.title = `${config.school} 방송부 대본 도우미`;
+  document.title = `방송부 · ${config.school}`;
   config.statuses.forEach(s => { $('statusFilter').add(new Option(s, s)); $('f-status').add(new Option(s, s)); });
   const warn = [];
   if (!config.aiReady) warn.push('Gemini API 키가 설정되지 않아 AI 기능을 쓸 수 없어요.');
@@ -88,10 +115,13 @@ async function init() {
 
 function setUser(user) {
   state.user = user;
+  state.scriptsLoaded = false;
   $('userBox').classList.toggle('hidden', !user);
+  toggleUserMenu(false);
   if (user) $('userName').textContent = `${user.name}${user.role === 'teacher' ? ' 선생님' : ''}`;
   $('btnAccounts').classList.toggle('hidden', user?.role !== 'teacher');
   $('btnPassword').classList.toggle('hidden', user?.role !== 'student');
+  syncNav();
 }
 
 function showLogin() {
@@ -122,20 +152,67 @@ async function doLogout() {
 /* ───────────── 화면 이동 ───────────── */
 
 function route() {
+  const params = new URLSearchParams(location.search);
+  toggleUserMenu(false);
+  syncNav();
+  setMenu(null);
   // 사용법은 로그인하지 않아도 볼 수 있다.
-  if (new URLSearchParams(location.search).has('help')) return showHelp();
+  if (params.has('help')) return showHelp();
   if (!state.user) return showLogin();
   if (state.user.mustChange) {
-    showOnly('listView');
-    $('listBox').innerHTML = '';
+    showOnly(null); // 뒤 화면은 비우고 비밀번호 바꾸기 창만
     return openPasswordDialog(true);
   }
-  const params = new URLSearchParams(location.search);
   if (params.has('accounts') && state.user.role === 'teacher') return showAccounts();
-  if (params.has('calendar')) return showCalendar(params.get('date'));
-  if (params.has('new')) return newScript();
-  if (params.get('id')) return openScript(params.get('id'));
-  return showList();
+  if (params.has('calendar')) { setMenu('calendar'); return showCalendar(params.get('date')); }
+  if (params.has('board')) return showBoard();
+  if (params.has('inbox')) return showInbox();
+  if (params.has('scripts')) return showList();
+  // 대본 편집·방송용 보기는 '대본' 메뉴에 속한다.
+  if (params.has('new')) { setMenu('scripts'); return newScript(); }
+  if (params.get('id')) { setMenu('scripts'); return openScript(params.get('id')); }
+  if (location.search) history.replaceState(null, '', '/'); // 학생의 ?accounts 같은 주소는 홈으로
+  return showHome();
+}
+
+/* ───────────── 홈 · 게시판 · 알림 ───────────── */
+
+/** 대본 목록을 받아 둔다. (홈의 이번 주 버튼과 대본 목록이 함께 쓴다) */
+async function loadScripts() {
+  state.scripts = await api('/api/scripts');
+  state.scriptsLoaded = true;
+  return state.scripts;
+}
+
+async function showHome() {
+  state.scriptsLoaded = false; // 새 목록을 받기 전에는 이번 주 버튼이 기다리게 한다
+  showOnly('homeView');
+  setMenu('home');
+  const u = state.user;
+  $('homeGreeting').textContent = u.role === 'teacher' ? `안녕하세요, ${u.name} 선생님` : `안녕하세요, ${u.name}님`;
+  const now = new Date();
+  $('homeDate').textContent = `${now.getMonth() + 1}월 ${now.getDate()}일 ${'일월화수목금토'[now.getDay()]}요일`;
+  // 처음 온 학생에게는 사용법 안내를 띄운다. (닫거나 사용법을 한 번 보면 다시 안 뜸)
+  let seen = false;
+  try { seen = !!localStorage.getItem(HELP_SEEN); } catch {}
+  $('firstHelp').classList.toggle('hidden', seen || u.role === 'teacher');
+  $('upcomingCard').classList.remove('hidden');
+  renderThisWeek();
+  loadUpcoming();
+  try {
+    await loadScripts();
+    renderThisWeek();
+  } catch (err) { toast('대본 목록을 불러오지 못했어요: ' + err.message); }
+}
+
+function showBoard() {
+  showOnly('boardView');
+  setMenu('board');
+}
+
+function showInbox() {
+  showOnly('inboxView');
+  setMenu('inbox');
 }
 
 /* ───────────── 방송부 일정 캘린더 ─────────────
@@ -387,7 +464,7 @@ function showHelp() {
   const isTeacher = state.user?.role === 'teacher';
   document.querySelectorAll('#helpView .teacher-only').forEach(el => el.classList.toggle('hidden', !isTeacher));
   $('btnHelpStart').innerHTML = state.user
-    ? icon('microphone-stage') + '이번 주 대본 만들러 가기'
+    ? icon('house') + '홈으로 가기'
     : icon('sign-in') + '로그인하러 가기';
   markHelpSeen();
 }
@@ -502,29 +579,28 @@ async function userAction(act, uid) {
 
 async function showList() {
   showOnly('listView');
-  // 처음 온 학생에게는 사용법 안내를 띄운다. (닫거나 사용법을 한 번 보면 다시 안 뜸)
-  let seen = false;
-  try { seen = !!localStorage.getItem(HELP_SEEN); } catch {}
-  $('firstHelp').classList.toggle('hidden', seen || state.user.role === 'teacher');
+  setMenu('scripts');
   $('listBox').innerHTML = '<div class="card muted">불러오는 중…</div>';
   try {
-    state.scripts = await api('/api/scripts');
+    await loadScripts();
     renderList();
   } catch (err) { $('listBox').innerHTML = `<div class="card">${esc(err.message)}</div>`; }
-  loadUpcoming();
 }
 
 /** 이번 주(다음 금요일) 대본이 이미 있으면 그 대본 */
 const thisWeekScript = () => state.scripts.find(s => s.broadcast_date === state.config.nextFriday);
 
-function renderList() {
+/** 홈의 큰 빨강 '이번 주 대본' 버튼 문구 */
+function renderThisWeek() {
   const tw = thisWeekScript();
   const date = state.config.nextFriday;
   $('thisWeekTitle').textContent = tw ? '이번 주 대본 이어서 만들기' : '이번 주 대본 만들기';
   $('thisWeekSub').textContent = tw
     ? `${md(date)}(금) 방송 · 지금 상태: ${tw.status}`
     : `${md(date)}(금) 방송 · AI와 함께 차근차근 만들어요`;
+}
 
+function renderList() {
   const q = $('search').value.trim();
   const st = $('statusFilter').value;
   const list = state.scripts.filter(s => (!st || s.status === st) &&
@@ -538,7 +614,7 @@ function renderList() {
       </div>
       <span class="badge badge-${esc(s.status)}">${esc(s.status)}</span>
     </a>`).join('')
-    : `<div class="card muted">${state.scripts.length ? '찾는 대본이 없어요.' : '아직 만든 대본이 없어요. 위의 큰 버튼을 눌러 시작해요!'}</div>`;
+    : `<div class="card muted">${state.scripts.length ? '찾는 대본이 없어요.' : '아직 만든 대본이 없어요. 홈의 이번 주 대본 버튼이나 다른 날 대본을 눌러 시작해요!'}</div>`;
 }
 
 /* ───────────── 편집 ───────────── */
@@ -826,7 +902,7 @@ async function openScript(id) {
     goStep(hasScriptText() ? 4 : 1);
   } catch (err) {
     alert(err.message);
-    navigate('', true);
+    navigate('?scripts', true);
   }
 }
 
@@ -836,7 +912,7 @@ async function removeScript() {
     await api('/api/scripts/' + state.current.id, { method: 'DELETE' });
     state.dirty = false;
     toast('삭제했어요.');
-    navigate('');
+    navigate('?scripts');
   } catch (err) { alert(err.message); }
 }
 
@@ -1186,13 +1262,32 @@ function restoreHistory() {
 
 function bindEvents() {
   $('loginForm').addEventListener('submit', doLogin);
-  $('btnLogout').addEventListener('click', doLogout);
+  // 메뉴: 편집 중이면 저장하고 이동. Ctrl/⌘/Shift 클릭은 브라우저가 새 탭·창으로 연다.
+  $('mainNav').addEventListener('click', e => {
+    const a = e.target.closest('a[data-menu]');
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    if (confirmLeave()) navigate(a.getAttribute('href').slice(1));
+  });
 
-  // 사용법
-  $('btnHelp').addEventListener('click', openHelp);
+  // 내 이름 버튼 → 계정 목록 (바깥 누름·Esc·항목 선택으로 닫힘)
+  $('btnUser').addEventListener('click', () => toggleUserMenu());
+  document.addEventListener('click', e => {
+    if (!$('userPop').classList.contains('hidden') && !$('userBox').contains(e.target)) toggleUserMenu(false);
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !$('userPop').classList.contains('hidden')) {
+      toggleUserMenu(false);
+      $('btnUser').focus();
+    }
+  });
+  $('userPop').addEventListener('click', e => { if (e.target.closest('.btn-menu')) toggleUserMenu(false); });
+  // Tab으로 목록 밖으로 나가면 닫는다.
+  $('userBox').addEventListener('focusout', e => { if (!$('userBox').contains(e.relatedTarget)) toggleUserMenu(false); });
+  $('btnLogout').addEventListener('click', doLogout);
+  $('menuHelp').addEventListener('click', openHelp);
 
   // 일정 캘린더
-  $('btnCalendar').addEventListener('click', () => { if (confirmLeave()) navigate('?calendar'); });
   document.addEventListener('click', e => {
     const a = e.target.closest('a[data-go]');
     if (a && !e.ctrlKey && !e.metaKey) { e.preventDefault(); if (confirmLeave()) navigate(a.dataset.go); }
@@ -1244,7 +1339,7 @@ function bindEvents() {
   $('passwordDialog').addEventListener('cancel', e => { if ($('passwordDialog').dataset.forced) e.preventDefault(); });
 
   $('btnAccounts').addEventListener('click', () => { if (confirmLeave()) navigate('?accounts'); });
-  $('btnAccountsBack').addEventListener('click', () => navigate(''));
+  $('btnAccountsBack').addEventListener('click', () => navigate('')); // 홈으로
   $('btnAddUsers').addEventListener('click', addUsers);
   $('userBody').addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
@@ -1256,11 +1351,19 @@ function bindEvents() {
     window.print();
     document.body.classList.remove('print-issued');
   });
-  $('brandLink').addEventListener('click', e => { e.preventDefault(); if (state.user && confirmLeave()) navigate(''); });
+  $('brandLink').addEventListener('click', e => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    if (state.user && confirmLeave()) navigate('');
+  });
 
   $('search').addEventListener('input', renderList);
   $('statusFilter').addEventListener('change', renderList);
-  $('btnThisWeek').addEventListener('click', () => {
+  $('btnThisWeek').addEventListener('click', async () => {
+    // 목록을 아직 못 받았으면 받고 나서 고른다. (이번 주 대본을 두 번 만들지 않도록)
+    if (!state.scriptsLoaded) {
+      try { await loadScripts(); } catch (err) { return toast('대본 목록을 불러오지 못했어요: ' + err.message); }
+    }
     const tw = thisWeekScript();
     navigate(tw ? '?id=' + encodeURIComponent(tw.id) : '?new');
   });
@@ -1334,7 +1437,7 @@ function bindEvents() {
   $('btnReview').addEventListener('click', requestReview);
   $('btnAll').addEventListener('click', aiAll);
   $('btnDelete').addEventListener('click', removeScript);
-  $('btnBack').addEventListener('click', () => { if (confirmLeave()) navigate(''); });
+  $('btnBack').addEventListener('click', () => { if (confirmLeave()) navigate('?scripts'); });
   $('btnShare').addEventListener('click', () => copy(location.origin + '/?id=' + state.current.id, '링크를 복사했어요. 방송부 친구에게 보내 주세요!'));
   $('btnRead').addEventListener('click', () => { $('readBox').innerHTML = renderReading(collect()); showOnly('readView'); });
   $('btnBackToEdit').addEventListener('click', () => showOnly('editView'));

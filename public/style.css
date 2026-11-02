@@ -154,13 +154,33 @@ label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weig
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); flex: 1; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); flex: 0 1 auto; min-width: 0; min-height: 44px; border-radius: var(--r-pill); }
 .brand-mark { width: 38px; height: 38px; border-radius: 12px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-size: 20px; flex: none; transform: rotate(-6deg); }
-.brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-.brand-school { font-size: 12px; color: var(--muted); font-weight: 600; }
-.brand-name { font-family: var(--font-display); font-size: 21px; white-space: nowrap; }
-.user-box { display: flex; align-items: center; gap: 4px; }
-.user-name { font-weight: 600; font-size: 14px; margin-right: 6px; padding: 4px 12px; border-radius: var(--r-pill); background: var(--surface-2); }
+.brand-name { font-family: var(--font-display); font-size: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.brand-school { margin-right: .3em; }
+
+/* 메뉴 (넓은 화면: 상단 탭) */
+.main-nav { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; margin-left: 8px; }
+.main-nav a {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 14px; border-radius: var(--r-pill);
+  color: var(--muted); font-weight: 600; font-size: 15px; text-decoration: none; white-space: nowrap;
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.main-nav a i { display: none; }
+.main-nav a:hover { background: var(--surface-2); color: var(--ink); }
+.main-nav a.on { color: var(--accent-ink); }
+.main-nav a.on::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: 4px; height: 2px; border-radius: 2px; background: var(--accent); }
+
+/* 내 이름 버튼 + 계정 목록 */
+.user-menu { position: relative; flex: none; margin-left: auto; }
+.user-btn { min-height: 44px; padding: 0 12px; gap: 6px; font-size: 14px; max-width: 220px; }
+.user-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.user-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 230px; display: grid; gap: 4px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 8px; box-shadow: var(--shadow);
+}
+.user-pop .btn-menu { min-height: 44px; width: 100%; color: var(--ink); }
 
 /* ── 로그인 ── */
 .login-card { max-width: 400px; margin: 48px auto; padding: 32px 28px; text-align: center; }
@@ -434,6 +454,14 @@ label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weig
 .up-date span { font-size: 11px; color: var(--muted); font-weight: 600; }
 .up-empty { padding: 6px 2px; }
 
+/* 홈 인사 · 곧 열리는 화면 */
+.home-head { margin: 4px 0 18px; }
+.home-head h2 { font-size: 28px; }
+.home-head p { margin: 2px 0 0; font-weight: 600; }
+.empty-card { text-align: center; padding: 40px 24px; }
+.empty-card h3 { justify-content: center; font-size: 24px; margin: 16px 0 6px; }
+.empty-card p { margin: 0 auto; max-width: 420px; line-height: 1.7; }
+
 /* ── 사용법 ── */
 .help-link { display: inline-flex; align-items: center; gap: 4px; justify-content: center; font-weight: 600; margin-bottom: 12px; }
 .first-help { align-items: center; }
@@ -535,8 +563,8 @@ dialog::backdrop { background: rgb(18 21 28 / .45); backdrop-filter: blur(2px); 
   .ann-row { flex-direction: column; }
   .section-hint { margin-left: 0; }
   .script-text { min-height: 240px; font-size: 17px; }
-  .brand-name { overflow: hidden; text-overflow: ellipsis; }
-  .user-name { display: none; }
+  .user-btn { max-width: 160px; padding: 0 10px; }
+  .home-head h2 { font-size: 24px; }
   /* 저장 상태는 버튼 위 한 줄로 */
   .wizard-nav { bottom: 8px; padding: 6px 8px 8px; flex-wrap: wrap; border-radius: 22px; }
   .wizard-nav #btnNext, .wizard-nav #btnPrev { padding: 0 14px; font-size: 15px; }
@@ -562,9 +590,35 @@ dialog::backdrop { background: rgb(18 21 28 / .45); backdrop-filter: blur(2px); 
   .grid.two { grid-template-columns: 1fr; }
 }
 
+/* ── 중간 화면 (900px 미만): 상단 탭이 내 이름 버튼과 겹치지 않게 학교 이름을 숨김 ── */
+@media (max-width: 899.98px) {
+  .brand-school { display: none; }
+}
+
+/* ── 좁은 화면 (720px 미만): 메뉴를 하단 탭 막대로 ── */
+@media (max-width: 719.98px) {
+  /* backdrop-filter가 있으면 안쪽 fixed 막대가 화면이 아니라 상단바에 붙으므로 끈다 */
+  .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--surface); }
+  .brand-school { display: none; }
+  .main-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; margin: 0;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--line);
+  }
+  .main-nav a { flex-direction: column; gap: 2px; min-height: 56px; padding: 6px 2px; font-size: 12.5px; border-radius: 16px; }
+  .main-nav a i { display: block; font-size: 24px; }
+  .main-nav a.on::after { display: none; }
+  /* 하단 막대(약 64px + 안전 영역)에 본문·단계 이동 막대·토스트가 가리지 않게 */
+  body.has-nav main { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+  body.has-nav .wizard-nav { bottom: calc(76px + env(safe-area-inset-bottom)); }
+  body.has-nav #toast { bottom: calc(160px + env(safe-area-inset-bottom)); }
+}
+
 /* ── 인쇄 ── */
 @media print {
-  .topbar, .no-print, .wizard-nav, .notice, #toast { display: none !important; }
+  .topbar, .main-nav, .no-print, .wizard-nav, .notice, #toast { display: none !important; }
+  body.has-nav main { padding-bottom: 0; }
   body { background: #fff; color: #111; }
   .card { box-shadow: none; border: 0; padding: 0; }
   body.print-issued #accountsView > :not(#issuedBox) { display: none !important; }

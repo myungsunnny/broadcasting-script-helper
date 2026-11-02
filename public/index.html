@@ -2,9 +2,9 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#CC3138">
-  <title>방송부 대본 도우미</title>
+  <title>방송부</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='28' fill='%23CC3138'/><circle cx='50' cy='50' r='16' fill='%23FDFDFE'/></svg>">
   <!-- 글꼴: 본문 Pretendard(또렷함), 제목 Jua(귀여움) / 아이콘: Phosphor -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -18,16 +18,27 @@
   <header class="topbar">
     <a href="/" class="brand" id="brandLink">
       <span class="brand-mark"><i class="ph-fill ph-microphone-stage"></i></span>
-      <span class="brand-text"><span id="schoolName" class="brand-school hide-sm">우리학교</span><span class="brand-name">방송부 대본 도우미</span></span>
+      <span class="brand-name"><span id="schoolName" class="brand-school">우리학교</span>방송부</span>
     </a>
-    <button class="btn-ghost btn-sm" id="btnHelp"><i class="ph ph-question"></i><span class="hide-sm">사용법</span></button>
-    <span id="userBox" class="user-box hidden">
-      <button class="btn-ghost btn-sm" id="btnCalendar"><i class="ph ph-calendar-dots"></i><span class="hide-sm">일정</span></button>
-      <span id="userName" class="user-name"></span>
-      <button class="btn-ghost btn-sm hidden" id="btnAccounts"><i class="ph ph-users-three"></i><span class="hide-sm">학생 계정</span></button>
-      <button class="btn-ghost btn-sm hidden" id="btnPassword"><i class="ph ph-key"></i><span class="hide-sm">비밀번호</span></button>
-      <button class="btn-ghost btn-sm" id="btnLogout" aria-label="로그아웃"><i class="ph ph-sign-out"></i><span class="hide-sm">로그아웃</span></button>
-    </span>
+    <!-- 메뉴: 넓은 화면은 상단 탭, 좁은 화면(720px 미만)은 하단 탭 막대 -->
+    <nav class="main-nav hidden" id="mainNav" aria-label="메뉴">
+      <a href="/" data-menu="home"><i class="ph ph-house" aria-hidden="true"></i><span>홈</span></a>
+      <a href="/?scripts" data-menu="scripts"><i class="ph ph-microphone-stage" aria-hidden="true"></i><span>대본</span></a>
+      <a href="/?calendar" data-menu="calendar"><i class="ph ph-calendar-dots" aria-hidden="true"></i><span>일정</span></a>
+      <a href="/?board" data-menu="board"><i class="ph ph-push-pin" aria-hidden="true"></i><span>게시판</span></a>
+      <a href="/?inbox" data-menu="inbox"><i class="ph ph-bell" aria-hidden="true"></i><span>알림</span></a>
+    </nav>
+    <div id="userBox" class="user-menu hidden">
+      <button type="button" class="btn-ghost user-btn" id="btnUser" aria-expanded="false" aria-controls="userPop">
+        <i class="ph ph-user-circle" aria-hidden="true"></i><span id="userName" class="user-name"></span><i class="ph ph-caret-down" aria-hidden="true"></i>
+      </button>
+      <div class="user-pop hidden" id="userPop">
+        <button type="button" class="btn-menu hidden" id="btnAccounts"><i class="ph ph-users-three"></i>학생 계정 관리</button>
+        <button type="button" class="btn-menu hidden" id="btnPassword"><i class="ph ph-key"></i>비밀번호 바꾸기</button>
+        <button type="button" class="btn-menu" id="menuHelp"><i class="ph ph-question"></i>사용법</button>
+        <button type="button" class="btn-menu" id="btnLogout"><i class="ph ph-sign-out"></i>로그아웃</button>
+      </div>
+    </div>
   </header>
 
   <main>
@@ -56,7 +67,7 @@
     <!-- 학생 계정 관리 (선생님) -->
     <section id="accountsView" class="hidden">
       <div class="page-head">
-        <button class="btn-ghost" id="btnAccountsBack"><i class="ph ph-arrow-left"></i>대본 목록</button>
+        <button class="btn-ghost" id="btnAccountsBack"><i class="ph ph-arrow-left"></i>홈으로</button>
         <h2 class="display">학생 계정 관리</h2>
       </div>
 
@@ -92,8 +103,12 @@
       </div>
     </section>
 
-    <!-- 대본 목록 -->
-    <section id="listView" class="hidden">
+    <!-- 홈 (첫 화면) -->
+    <section id="homeView" class="hidden">
+      <div class="home-head">
+        <h2 class="display" id="homeGreeting">안녕하세요</h2>
+        <p class="muted" id="homeDate"></p>
+      </div>
       <div class="notice notice-info first-help hidden" id="firstHelp">
         <i class="ph ph-hand-waving"></i>
         <span class="grow">처음 왔나요? 3분이면 다 읽는 <b>사용법</b>을 먼저 봐요.</span>
@@ -116,6 +131,13 @@
         </div>
         <div id="upcomingList" class="upcoming-list"></div>
       </div>
+    </section>
+
+    <!-- 대본 목록 -->
+    <section id="listView" class="hidden">
+      <div class="page-head">
+        <h2 class="display">대본</h2>
+      </div>
       <div class="list-tools">
         <div class="search">
           <i class="ph ph-magnifying-glass"></i>
@@ -125,6 +147,30 @@
         <button class="btn-ghost" id="btnNew"><i class="ph ph-calendar-blank"></i>다른 날 대본</button>
       </div>
       <div id="listBox" class="list"></div>
+    </section>
+
+    <!-- 게시판 (곧 열림) -->
+    <section id="boardView" class="hidden">
+      <div class="page-head">
+        <h2 class="display">게시판</h2>
+      </div>
+      <div class="card empty-card">
+        <span class="login-mark"><i class="ph-fill ph-push-pin"></i></span>
+        <h3 class="display">곧 열려요</h3>
+        <p class="muted">선생님 공지와 부원 메모를 이곳에서 함께 보게 될 거예요. 조금만 기다려 주세요.</p>
+      </div>
+    </section>
+
+    <!-- 알림 (곧 열림) -->
+    <section id="inboxView" class="hidden">
+      <div class="page-head">
+        <h2 class="display">알림</h2>
+      </div>
+      <div class="card empty-card">
+        <span class="login-mark"><i class="ph-fill ph-bell"></i></span>
+        <h3 class="display">곧 열려요</h3>
+        <p class="muted">새 공지, 선생님 의견, 나를 넣은 일정 같은 새 소식을 이곳에 모아 보여 줄 거예요.</p>
+      </div>
     </section>
 
     <!-- 대본 만들기 (4단계) -->
@@ -267,13 +313,14 @@
       <div class="help-hero">
         <span class="login-mark"><i class="ph-fill ph-book-open-text"></i></span>
         <div>
-          <h2 class="display">방송부 대본 도우미 사용법</h2>
-          <p class="muted">AI와 함께 금요방송 대본을 만들어요. 아래 순서대로 따라 하면 돼요.</p>
+          <h2 class="display">방송부 사이트 사용법</h2>
+          <p class="muted">메뉴로 홈, 대본, 일정, 게시판, 알림을 오가며 쓰고, AI와 함께 금요방송 대본을 만들어요. 아래 순서대로 따라 하면 돼요.</p>
         </div>
       </div>
 
       <nav class="help-toc" aria-label="사용법 차례">
         <a href="#h-start">들어가기</a>
+        <a href="#h-menu">메뉴</a>
         <a href="#h-step1">1 누가 방송해요?</a>
         <a href="#h-step2">2 무엇을 소개해요?</a>
         <a href="#h-step3">3 AI 초안</a>
@@ -293,7 +340,19 @@
           <li>처음 들어오면 <b>비밀번호 바꾸기</b> 창이 떠요. 나만 아는 새 비밀번호(4글자 이상)로 바꿔요.</li>
           <li>비밀번호를 잊어버렸다면 선생님께 <b>초기화</b>를 부탁해요.</li>
         </ol>
-        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>들어가면 맨 위에 빨간 큰 버튼 <b>이번 주 대본 만들기</b>가 보여요. 이 버튼 하나로 시작해요. 이미 만들던 대본이 있으면 <b>이어서 만들기</b>로 바뀌어요.</span></div>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>들어가면 <b>홈</b> 화면에 빨간 큰 버튼 <b>이번 주 대본 만들기</b>가 보여요. 이 버튼 하나로 시작해요. 이미 만들던 대본이 있으면 <b>이어서 만들기</b>로 바뀌어요.</span></div>
+      </article>
+
+      <article class="card help-card" id="h-menu">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-squares-four"></i></span>메뉴</h3>
+        <ol class="help-steps">
+          <li>넓은 화면(컴퓨터)은 화면 <b>맨 위</b>, 좁은 화면(휴대폰)은 화면 <b>맨 아래</b>에 메뉴가 있어요. 지금 보고 있는 메뉴는 빨간색이에요.</li>
+          <li><b><i class="ph ph-house"></i> 홈</b>: 인사와 오늘 날짜, <b>이번 주 대본</b> 버튼, 다가오는 방송부 일정이 있어요.</li>
+          <li><b><i class="ph ph-microphone-stage"></i> 대본</b>: 지금까지 만든 대본 목록이에요. 찾기, 상태로 거르기, <b>다른 날 대본</b> 만들기를 할 수 있어요.</li>
+          <li><b><i class="ph ph-calendar-dots"></i> 일정</b>: 방송부 한 달 달력이에요.</li>
+          <li><b><i class="ph ph-push-pin"></i> 게시판</b>과 <b><i class="ph ph-bell"></i> 알림</b>은 곧 열려요.</li>
+          <li>오른쪽 위 <span class="btn btn-ghost btn-sm demo"><i class="ph ph-user-circle"></i>내 이름<i class="ph ph-caret-down"></i></span>을 누르면 학생은 <b>비밀번호 바꾸기</b>, 선생님은 <b>학생 계정 관리</b>가 나오고, <b>사용법</b>과 <b>로그아웃</b>도 함께 나와요.</li>
+        </ol>
       </article>
 
       <article class="card help-card" id="h-step1">
@@ -361,7 +420,7 @@
       <article class="card help-card" id="h-calendar">
         <h3 class="help-title"><span class="h-icon"><i class="ph ph-calendar-dots"></i></span>방송부 일정 캘린더</h3>
         <ol class="help-steps">
-          <li>위쪽 <span class="btn btn-ghost btn-sm demo"><i class="ph ph-calendar-dots"></i>일정</span>을 누르면 한 달 달력이 나와요. 대본 목록 위 <b>다가오는 방송부 일정</b>에서도 열 수 있어요.</li>
+          <li>메뉴의 <b><i class="ph ph-calendar-dots"></i> 일정</b>을 누르면 한 달 달력이 나와요. 홈의 <b>다가오는 방송부 일정</b>에서도 열 수 있어요.</li>
           <li>날짜를 누르면 그날 일정이 아래에 자세히 보여요. 대본이 있는 날에는 <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>도 함께 보이고, 누르면 그 대본이 열려요.</li>
           <li><span class="btn btn-primary btn-sm demo"><i class="ph ph-plus"></i>일정 추가</span>를 눌러 종류(<span class="cat cat-방송">방송</span> <span class="cat cat-연습">연습</span> <span class="cat cat-회의">회의</span> <span class="cat cat-기타">기타</span>), 이름, 시간, 함께하는 부원, 할 일을 써요.</li>
           <li>일정이 끝나면 <span class="btn btn-soft btn-sm demo"><i class="ph ph-notebook"></i>기록 남기기</span>를 눌러 어떻게 됐는지 적어요. 다음 방송 때 큰 도움이 돼요.</li>
@@ -392,9 +451,9 @@
       <section class="card help-card teacher-only" id="h-teacher">
         <h3 class="help-title"><span class="h-icon"><i class="ph ph-chalkboard-teacher"></i></span>선생님 안내</h3>
         <ul class="help-steps plain-list">
-          <li><b>학생 계정</b>: 위쪽 <b>학생 계정</b>에서 이름을 한 줄에 한 명씩 넣으면 4자리 임시 비밀번호가 만들어져요. 표를 인쇄해 나눠 주세요.</li>
+          <li><b>학생 계정</b>: 오른쪽 위 내 이름 버튼을 누르고 <b>학생 계정 관리</b>에서 이름을 한 줄에 한 명씩 넣으면 4자리 임시 비밀번호가 만들어져요. 표를 인쇄해 나눠 주세요.</li>
           <li><b>미리 골라 두기</b>: 이번 주 대본을 먼저 열어 행사와 계기교육 주제를 골라 두면 학생 화면에도 그대로 보여요.</li>
-          <li><b>검토하기</b>: 목록에서 <span class="badge badge-검토요청">검토요청</span> 대본을 열고, 4단계의 메모 칸에 피드백을 남겨 주세요.</li>
+          <li><b>검토하기</b>: <b>대본</b> 메뉴의 목록에서 <span class="badge badge-검토요청">검토요청</span> 대본을 열고, 4단계의 메모 칸에 피드백을 남겨 주세요.</li>
           <li><b>완료와 삭제</b>: 오른쪽 아래 <b>⋯</b> 메뉴에서 상태를 <span class="badge badge-완료">완료</span>로 바꾸거나 대본을 삭제할 수 있어요.</li>
           <li><b>되돌리기</b>: ⋯ 메뉴의 <b>수정 기록</b>에서 예전 내용을 미리 보고 되돌릴 수 있어요.</li>
         </ul>
