@@ -115,6 +115,16 @@
         <a href="/?help" class="btn btn-primary btn-sm" data-nav="?help">사용법 보기</a>
         <button class="btn-ghost btn-sm" id="btnHideFirstHelp" aria-label="안내 닫기"><i class="ph ph-x"></i></button>
       </div>
+      <!-- 선생님: 검토 기다리는 대본 (인사 바로 아래, 이번 주 버튼 위) -->
+      <div class="card upcoming-card home-card hidden" id="reviewCard">
+        <div class="card-head">
+          <h3><i class="ph ph-clipboard-text"></i>검토 기다리는 대본</h3>
+          <span class="badge badge-검토요청 hidden" id="reviewCount"></span>
+          <span class="grow"></span>
+          <a href="/?scripts" class="btn btn-ghost btn-sm" data-go="?scripts">대본 목록<i class="ph ph-arrow-right"></i></a>
+        </div>
+        <div id="reviewList" class="upcoming-list"></div>
+      </div>
       <button class="hero-btn" id="btnThisWeek">
         <span class="hero-icon"><i class="ph-fill ph-microphone-stage"></i></span>
         <span class="hero-copy">
@@ -123,13 +133,31 @@
         </span>
         <i class="ph ph-arrow-right hero-arrow"></i>
       </button>
-      <div class="card upcoming-card" id="upcomingCard">
+      <!-- 학생: 내 할 일 -->
+      <div class="card upcoming-card home-card hidden" id="todoCard">
         <div class="card-head">
-          <h3><i class="ph ph-calendar-dots"></i>다가오는 방송부 일정</h3>
-          <span class="grow"></span>
-          <a href="/?calendar" class="btn btn-ghost btn-sm" data-go="?calendar">캘린더 열기<i class="ph ph-arrow-right"></i></a>
+          <h3><i class="ph ph-check-square"></i>내 할 일</h3>
+          <span class="badge hidden" id="todoCount"></span>
         </div>
-        <div id="upcomingList" class="upcoming-list"></div>
+        <div id="todoList" class="upcoming-list"></div>
+      </div>
+      <div class="home-grid">
+        <div class="card upcoming-card home-card" id="noticeCard">
+          <div class="card-head">
+            <h3><i class="ph ph-push-pin"></i>새 공지</h3>
+            <span class="grow"></span>
+            <a href="/?board" class="btn btn-ghost btn-sm" data-go="?board">게시판<i class="ph ph-arrow-right"></i></a>
+          </div>
+          <div id="noticeList" class="upcoming-list"></div>
+        </div>
+        <div class="card upcoming-card home-card" id="upcomingCard">
+          <div class="card-head">
+            <h3><i class="ph ph-calendar-dots"></i>다가오는 일정</h3>
+            <span class="grow"></span>
+            <a href="/?calendar" class="btn btn-ghost btn-sm" data-go="?calendar">캘린더<i class="ph ph-arrow-right"></i></a>
+          </div>
+          <div id="upcomingList" class="upcoming-list"></div>
+        </div>
       </div>
     </section>
 
@@ -340,14 +368,16 @@
           <li>처음 들어오면 <b>비밀번호 바꾸기</b> 창이 떠요. 나만 아는 새 비밀번호(4글자 이상)로 바꿔요.</li>
           <li>비밀번호를 잊어버렸다면 선생님께 <b>초기화</b>를 부탁해요.</li>
         </ol>
-        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>들어가면 <b>홈</b> 화면에 빨간 큰 버튼 <b>이번 주 대본 만들기</b>가 보여요. 이 버튼 하나로 시작해요. 이미 만들던 대본이 있으면 <b>이어서 만들기</b>로 바뀌어요.</span></div>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>들어가면 <b>홈</b> 화면에 빨간 큰 버튼 <b>이번 주 대본 만들기</b>가 보여요. 이 버튼 하나로 시작해요. 이미 만들던 대본이 있으면 <b>이어서 만들기</b>로 바뀌어요. 그 아래 <b>내 할 일</b>에서 오늘 할 일을 확인해요.</span></div>
       </article>
 
       <article class="card help-card" id="h-menu">
         <h3 class="help-title"><span class="h-icon"><i class="ph ph-squares-four"></i></span>메뉴</h3>
         <ol class="help-steps">
           <li>넓은 화면(컴퓨터)은 화면 <b>맨 위</b>, 좁은 화면(휴대폰)은 화면 <b>맨 아래</b>에 메뉴가 있어요. 지금 보고 있는 메뉴는 빨간색이에요.</li>
-          <li><b><i class="ph ph-house"></i> 홈</b>: 인사와 오늘 날짜, <b>이번 주 대본</b> 버튼, 다가오는 방송부 일정이 있어요.</li>
+          <li><b><i class="ph ph-house"></i> 홈</b>: 인사와 오늘 날짜, <b>이번 주 대본</b> 버튼, <b>내 할 일</b>, <b>새 공지</b>, 그리고 앞으로 있을 <b>다가오는 일정</b>(5개까지)이 한 화면에 모여 있어요. 선생님 화면에는 <b>내 할 일</b> 대신 맨 위에 <b>검토 기다리는 대본</b>이 나와요.
+            <b>내 할 일</b>에는 일주일 안에 방송하는 <span class="badge badge-작성중">작성중</span> 내 대본(내가 만들었거나 아나운서인 대본)과, 내가 함께하는 오늘·내일 일정이 나와요. 누르면 바로 그 대본이나 캘린더 그날이 열려요.
+            새 공지는 게시판이 열리면 여기에 보여요. 다가오는 일정 중 대본이 있는 날에는 <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>이 붙어요.</li>
           <li><b><i class="ph ph-microphone-stage"></i> 대본</b>: 지금까지 만든 대본 목록이에요. 찾기, 상태로 거르기, <b>다른 날 대본</b> 만들기를 할 수 있어요.</li>
           <li><b><i class="ph ph-calendar-dots"></i> 일정</b>: 방송부 한 달 달력이에요.</li>
           <li><b><i class="ph ph-push-pin"></i> 게시판</b>과 <b><i class="ph ph-bell"></i> 알림</b>은 곧 열려요.</li>
@@ -420,7 +450,7 @@
       <article class="card help-card" id="h-calendar">
         <h3 class="help-title"><span class="h-icon"><i class="ph ph-calendar-dots"></i></span>방송부 일정 캘린더</h3>
         <ol class="help-steps">
-          <li>메뉴의 <b><i class="ph ph-calendar-dots"></i> 일정</b>을 누르면 한 달 달력이 나와요. 홈의 <b>다가오는 방송부 일정</b>에서도 열 수 있어요.</li>
+          <li>메뉴의 <b><i class="ph ph-calendar-dots"></i> 일정</b>을 누르면 한 달 달력이 나와요. 홈의 <b>다가오는 일정</b>에서도 열 수 있어요. 내가 <b>함께하는 부원</b>인 오늘·내일 일정은 홈의 <b>내 할 일</b>에도 나와요.</li>
           <li>날짜를 누르면 그날 일정이 아래에 자세히 보여요. 대본이 있는 날에는 <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>도 함께 보이고, 누르면 그 대본이 열려요.</li>
           <li><span class="btn btn-primary btn-sm demo"><i class="ph ph-plus"></i>일정 추가</span>를 눌러 종류(<span class="cat cat-방송">방송</span> <span class="cat cat-연습">연습</span> <span class="cat cat-회의">회의</span> <span class="cat cat-기타">기타</span>), 이름, 시간, 함께하는 부원, 할 일을 써요.</li>
           <li>일정이 끝나면 <span class="btn btn-soft btn-sm demo"><i class="ph ph-notebook"></i>기록 남기기</span>를 눌러 어떻게 됐는지 적어요. 다음 방송 때 큰 도움이 돼요.</li>
@@ -453,7 +483,7 @@
         <ul class="help-steps plain-list">
           <li><b>학생 계정</b>: 오른쪽 위 내 이름 버튼을 누르고 <b>학생 계정 관리</b>에서 이름을 한 줄에 한 명씩 넣으면 4자리 임시 비밀번호가 만들어져요. 표를 인쇄해 나눠 주세요.</li>
           <li><b>미리 골라 두기</b>: 이번 주 대본을 먼저 열어 행사와 계기교육 주제를 골라 두면 학생 화면에도 그대로 보여요.</li>
-          <li><b>검토하기</b>: <b>대본</b> 메뉴의 목록에서 <span class="badge badge-검토요청">검토요청</span> 대본을 열고, 4단계의 메모 칸에 피드백을 남겨 주세요.</li>
+          <li><b>검토하기</b>: 홈 맨 위 <b>검토 기다리는 대본</b> 카드에 <span class="badge badge-검토요청">검토요청</span> 대본이 방송일 빠른 순으로 모여요(최대 10개). 누르면 그 대본이 열려요. <b>대본</b> 메뉴의 목록에서 상태로 걸러 찾아도 돼요. 4단계의 메모 칸에 피드백을 남겨 주세요.</li>
           <li><b>완료와 삭제</b>: 오른쪽 아래 <b>⋯</b> 메뉴에서 상태를 <span class="badge badge-완료">완료</span>로 바꾸거나 대본을 삭제할 수 있어요.</li>
           <li><b>되돌리기</b>: ⋯ 메뉴의 <b>수정 기록</b>에서 예전 내용을 미리 보고 되돌릴 수 있어요.</li>
         </ul>

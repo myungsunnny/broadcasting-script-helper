@@ -15,7 +15,7 @@ function parseMembers(v) {
   try { return JSON.parse(v || '[]'); } catch { return []; }
 }
 
-const toEvent = row => ({ ...row, members: parseMembers(row.members) });
+export const toEvent = row => ({ ...row, members: parseMembers(row.members) });
 
 function clean(input) {
   const date = String(input.date || '');
@@ -46,11 +46,16 @@ export async function listCalendar(env, from, to) {
   return { events: events.results.map(toEvent), scripts: scripts.results };
 }
 
-/** 오늘부터 다가오는 일정 몇 개 (대본 목록 화면용) */
-export async function upcomingEvents(env, today, limit = 3) {
-  const { results } = await env.DB.prepare(
+/** 오늘부터 다가오는 일정 몇 개를 읽는 문장 (홈 묶음 batch에서도 쓴다) */
+export function upcomingStatement(env, today, limit = 5) {
+  return env.DB.prepare(
     'SELECT * FROM calendar_events WHERE date >= ? ORDER BY date, time = \'\' DESC, time LIMIT ?'
-  ).bind(today, limit).all();
+  ).bind(today, limit);
+}
+
+/** 오늘부터 다가오는 일정 몇 개 */
+export async function upcomingEvents(env, today, limit = 5) {
+  const { results } = await upcomingStatement(env, today, limit).all();
   return results.map(toEvent);
 }
 
