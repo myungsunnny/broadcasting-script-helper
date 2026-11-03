@@ -3,6 +3,7 @@
 
 import { hashPassword, tempPassword } from './auth.js';
 import { nowKST } from './dates.js';
+import { deleteRecipientStatement } from './notify.js';
 
 const MAX_NAME = 20;
 
@@ -72,10 +73,11 @@ export async function resetPassword(env, id) {
   return { id, name: row.name, login_id: row.login_id, password };
 }
 
-/** 계정을 지운다. 그 학생이 쓴 대본·메모는 그대로 남고, 공지 읽음 기록은 함께 지운다. */
+/** 계정을 지운다. 그 학생이 쓴 대본·메모는 그대로 남고, 공지 읽음 기록과 그 학생 알림은 함께 지운다. */
 export async function deleteUser(env, id) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM post_reads WHERE user_uid = ?').bind(id),
+    deleteRecipientStatement(env, id),
     env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id)
   ]);
   return { ok: true };

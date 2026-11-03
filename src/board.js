@@ -4,6 +4,7 @@
 // 읽음 기록은 학생이 공지를 펼칠 때 남기고, 선생님은 사용 중인 학생 중 누가 읽었는지 본다.
 
 import { nowKST } from './dates.js';
+import { activeStudents, notifyStatements, deleteNotificationsStatement } from './notify.js';
 
 export const KINDS = ['notice', 'memo'];
 const PAGE_SIZE = 20;
@@ -147,10 +148,17 @@ export async function createPost(env, user, input) {
   if (pinned) await checkPinLimit(env);
   const id = crypto.randomUUID().slice(0, 8);
   const now = nowKST();
-  await env.DB.prepare(
-    `INSERT INTO posts (id, kind, title, body, pinned, created_by, created_by_uid, created_at, updated_by, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(id, kind, title, body, pinned, user.name, user.uid || '', now, user.name, now).run();
+  // 공지는 사용 중인 학생 모두에게 알림 (같은 batch). 메모는 알림 없음.
+  const notices = kind === 'notice' ? notifyStatements(env, {
+    recipients: (await activeStudents(env)).map(u => u.id), kind: 'notice', refId: id, text: `새 공지: ${title}`
+  }) : [];
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO posts (id, kind, title, body, pinned, created_by, created_by_uid, created_at, updated_by, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, kind, title, body, pinned, user.name, user.uid || '', now, user.name, now),
+    ...notices
+  ]);
   return getPost(env, user, id);
 }
 
@@ -169,12 +177,13 @@ export async function updatePost(env, user, id, input) {
   return getPost(env, user, id);
 }
 
-/** 지우기: 글과 그 글의 읽음 기록을 같은 batch로 */
+/** 지우기: 글과 그 글의 읽음 기록·알림을 같은 batch로 */
 export async function deletePost(env, user, id) {
   const row = await getRow(env, id);
   if (!canDelete(row, user)) throw new BoardError(403, '내가 쓴 메모만 지울 수 있어요.');
   await env.DB.batch([
     env.DB.prepare('DELETE FROM post_reads WHERE post_id = ?').bind(id),
+    deleteNotificationsStatement(env, ['notice'], id),
     env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(id)
   ]);
   return { ok: true };

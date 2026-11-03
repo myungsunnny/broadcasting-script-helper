@@ -30,3 +30,6 @@
 - source_spec: `_bmad-output/specs/spec-club-site/stories/4-review-comments.md`
   summary: 홈 '선생님 의견' 줄의 `?id=&tab=` 연결, `openScript`의 탭 고르기, 4단계 탭 배지 수(반영 안 된 것만)를 확인하는 화면 시험이 없다.
   evidence: 저장소에 `public/app.js`를 불러오는 시험 도구가 없다. 서버 쪽 `section`·`count`는 `test/comments.test.js`·`test/home.test.js`가 확인하고, 화면은 로컬 `wrangler dev`에서 사람이 눌러 확인했다.
+- source_spec: `_bmad-output/specs/spec-club-site/stories/5-inbox.md`
+  summary: 알림 줄의 이동 주소(`inboxQuery`: 의견은 `&tab=`, 일정은 `?calendar&date=`), '몇 분 전'(`timeAgo`), 메뉴 배지 수를 확인하는 화면 시험이 없다.
+  evidence: 저장소에 `public/app.js`를 불러오는 시험 도구가 없다. 서버의 `ref_date`(구성 키·날짜)는 `test/notify.test.js`가 확인하고, 화면은 로컬 `wrangler dev`에서 눌러 확인했다. `inboxQuery`·`timeAgo`를 작은 모듈로 빼면 `node:test`로 시험할 수 있다.

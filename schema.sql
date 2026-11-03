@@ -94,3 +94,16 @@ CREATE TABLE IF NOT EXISTS script_comments (
   resolved_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_comments_script ON script_comments (script_id, created_at);
+
+-- 알림: 받는 사람마다 한 줄 (90일 지나면 알림을 넣을 때 함께 지움)
+CREATE TABLE IF NOT EXISTS notifications (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  recipient  TEXT NOT NULL,     -- 학생 uid 또는 'teacher'(선생님 공용)
+  kind       TEXT NOT NULL,     -- notice / comment / done / calendar / review
+  ref_id     TEXT NOT NULL,     -- 공지 id, 대본 id, 일정 id
+  ref_date   TEXT NOT NULL DEFAULT '', -- 이동 보조값: 일정은 날짜, 의견은 구성 키
+  text       TEXT NOT NULL,     -- 화면에 보일 한 줄
+  created_at TEXT NOT NULL,
+  read_at    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications (recipient, read_at, id DESC);

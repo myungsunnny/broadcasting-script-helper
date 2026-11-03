@@ -3,6 +3,7 @@
 // 대본(scripts)의 방송일도 함께 돌려줘서 달력에 "대본" 표시가 나오게 한다.
 
 import { isValidDate, nowKST } from './dates.js';
+import { activeStudents, notifyStatements, deleteNotificationsStatement, md } from './notify.js';
 
 export const CATEGORIES = ['방송', '연습', '회의', '기타'];
 const MAX_TEXT = 2000;
@@ -59,6 +60,19 @@ export async function upcomingEvents(env, today, limit = 5) {
   return results.map(toEvent);
 }
 
+/** 새로 '함께하는 부원'이 된 이름과 같은 사용 중인 학생에게 알림 (저장한 본인 제외) */
+async function memberNotices(env, user, id, e, oldMembers = []) {
+  const before = new Set(oldMembers.map(m => String(m).trim()));
+  const added = new Set(JSON.parse(e.members).filter(m => !before.has(m)));
+  if (!added.size) return [];
+  const who = user.role === 'teacher' ? `${user.name} 선생님이` : `${user.name}님이`;
+  return notifyStatements(env, {
+    recipients: (await activeStudents(env)).filter(u => added.has(String(u.name).trim()) && u.id !== user.uid).map(u => u.id),
+    kind: 'calendar', refId: id, refDate: e.date,
+    text: `${who} ${md(e.date)} ${e.title} 일정에 나를 넣었어요`
+  });
+}
+
 async function getEvent(env, id) {
   const row = await env.DB.prepare('SELECT * FROM calendar_events WHERE id = ?').bind(id).first();
   if (!row) throw new CalendarError(404, '일정을 찾을 수 없어요.');
@@ -69,20 +83,28 @@ export async function createEvent(env, user, input) {
   const e = clean(input);
   const id = crypto.randomUUID().slice(0, 8);
   const now = nowKST();
-  await env.DB.prepare(
-    `INSERT INTO calendar_events (id, date, time, title, category, members, note, record, created_by, created_by_uid, created_at, updated_by, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(id, e.date, e.time, e.title, e.category, e.members, e.note, e.record, user.name, user.uid || '', now, user.name, now).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO calendar_events (id, date, time, title, category, members, note, record, created_by, created_by_uid, created_at, updated_by, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, e.date, e.time, e.title, e.category, e.members, e.note, e.record, user.name, user.uid || '', now, user.name, now),
+    ...await memberNotices(env, user, id, e)
+  ]);
   return toEvent(await getEvent(env, id));
 }
 
 export async function updateEvent(env, user, id, input) {
-  await getEvent(env, id);
+  const old = await getEvent(env, id);
   const e = clean(input);
-  await env.DB.prepare(
-    `UPDATE calendar_events SET date = ?, time = ?, title = ?, category = ?, members = ?, note = ?, record = ?, updated_by = ?, updated_at = ?
-     WHERE id = ?`
-  ).bind(e.date, e.time, e.title, e.category, e.members, e.note, e.record, user.name, nowKST(), id).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE calendar_events SET date = ?, time = ?, title = ?, category = ?, members = ?, note = ?, record = ?, updated_by = ?, updated_at = ?
+       WHERE id = ?`
+    ).bind(e.date, e.time, e.title, e.category, e.members, e.note, e.record, user.name, nowKST(), id),
+    ...await memberNotices(env, user, id, e, parseMembers(old.members)),
+    // 날짜를 옮기면 이미 보낸 알림도 새 날짜로 열리게
+    env.DB.prepare("UPDATE notifications SET ref_date = ? WHERE kind = 'calendar' AND ref_id = ?").bind(e.date, id)
+  ]);
   return toEvent(await getEvent(env, id));
 }
 
@@ -90,7 +112,10 @@ export async function deleteEvent(env, user, id) {
   const row = await getEvent(env, id);
   const isOwner = user.uid ? row.created_by_uid === user.uid : false;
   if (user.role !== 'teacher' && !isOwner) throw new CalendarError(403, '일정은 만든 사람이나 선생님만 지울 수 있어요.');
-  await env.DB.prepare('DELETE FROM calendar_events WHERE id = ?').bind(id).run();
+  await env.DB.batch([
+    deleteNotificationsStatement(env, ['calendar'], id),
+    env.DB.prepare('DELETE FROM calendar_events WHERE id = ?').bind(id)
+  ]);
   return { ok: true };
 }
 

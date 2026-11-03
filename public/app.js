@@ -12,7 +12,7 @@ const QUICK_ASKS = ['더 짧게', '더 길게', '더 쉽게', '더 재미있게'
 const META_FIELDS = ['broadcast_date', 'title', 'status', 'memo'];
 const CHARS_PER_SECOND = 5; // 초등 아나운서 낭독 속도(대략)
 
-const state = { user: null, config: null, scripts: [], home: null, homeLoaded: false, homeReq: null, homeSeq: 0, current: null, dirty: false, historyRow: null, step: 1, tab: 'greeting', editSeq: 0 };
+const state = { user: null, config: null, scripts: [], home: null, homeLoaded: false, homeReq: null, homeSeq: 0, current: null, dirty: false, historyRow: null, step: 1, tab: 'greeting', editSeq: 0, inboxSeq: 0 };
 
 /* ───────────── 공통 도구 ───────────── */
 
@@ -128,6 +128,8 @@ function setUser(user) {
   if (user) $('userName').textContent = `${user.name}${user.role === 'teacher' ? ' 선생님' : ''}`;
   $('btnAccounts').classList.toggle('hidden', user?.role !== 'teacher');
   $('btnPassword').classList.toggle('hidden', user?.role !== 'student');
+  state.inboxSeq++; // 받던 배지·알림 응답은 버린다
+  setInboxBadge(0);
   syncNav();
 }
 
@@ -170,6 +172,7 @@ function route() {
     showOnly(null); // 뒤 화면은 비우고 비밀번호 바꾸기 창만
     return openPasswordDialog(true);
   }
+  if (!params.has('inbox')) refreshInboxBadge(); // 알림 화면은 목록 응답으로 배지를 맞춘다
   if (params.has('accounts') && state.user.role === 'teacher') return showAccounts();
   if (params.has('calendar')) { setMenu('calendar'); return showCalendar(params.get('date')); }
   if (params.has('board')) return showBoard(params.get('post'));
@@ -610,9 +613,90 @@ async function removePost(id) {
   }
 }
 
-function showInbox() {
+/* ───────────── 알림 ─────────────
+   메뉴 배지는 화면을 옮길 때마다 안 읽은 수를 새로 받는다(늦게 온 예전 응답은 무시). 실시간 갱신은 없다.
+   알림을 누르면 읽음 처리를 마친 뒤 그 화면으로 간다. */
+
+const INBOX_ICONS = { notice: 'push-pin', comment: 'chat-circle-text', done: 'check-circle', calendar: 'calendar-dots', review: 'paper-plane-right' };
+
+function setInboxBadge(n) {
+  const b = $('inboxBadge');
+  // 화면 읽기 프로그램은 span의 aria-label을 안 읽을 수 있어 숨은 글자로 뜻을 붙인다
+  b.innerHTML = `<span class="sr-only">안 읽은 알림 </span>${n > 99 ? '99+' : n}<span class="sr-only">개</span>`;
+  b.classList.toggle('hidden', !n);
+}
+
+async function refreshInboxBadge() {
+  const seq = ++state.inboxSeq;
+  try {
+    const { unread } = await api('/api/notifications/count');
+    if (seq === state.inboxSeq) setInboxBadge(unread);
+  } catch { /* 배지는 다음 이동 때 다시 받는다 */ }
+}
+
+/** 알림이 가리키는 화면 주소 */
+function inboxQuery(n) {
+  if (n.kind === 'notice') return postQuery(n.ref_id);
+  if (n.kind === 'calendar') return `?calendar&date=${encodeURIComponent(n.ref_date)}`;
+  if (n.kind === 'comment' && n.ref_date) return `${scriptQuery(n.ref_id)}&tab=${encodeURIComponent(n.ref_date)}`;
+  return scriptQuery(n.ref_id);
+}
+
+/** 서버 시각 기준 '방금 / n분 전 / n시간 전 / 어제 / 11/6' */
+function timeAgo(at, now) {
+  const t = s => Date.parse(s.replace(' ', 'T'));
+  const min = Math.floor((t(now) - t(at)) / 60000);
+  if (min < 1) return '방금';
+  if (min < 60) return `${min}분 전`;
+  if (min < 24 * 60 && at.slice(0, 10) === now.slice(0, 10)) return `${Math.floor(min / 60)}시간 전`;
+  const days = Math.round((t(now.slice(0, 10)) - t(at.slice(0, 10))) / 86400000);
+  return days === 1 ? '어제' : md(at.slice(0, 10));
+}
+
+async function showInbox() {
   showOnly('inboxView');
   setMenu('inbox');
+  $('inboxList').innerHTML = skeleton(3, '알림을 불러오는 중…');
+  $('btnReadAll').disabled = true;
+  const seq = ++state.inboxSeq;
+  let data;
+  try { data = await api('/api/notifications'); }
+  catch (err) {
+    if (seq !== state.inboxSeq) return;
+    toast('알림을 불러오지 못했어요: ' + err.message);
+    $('inboxList').innerHTML = '<div class="card empty-card"><p class="muted">알림을 불러오지 못했어요. 잠시 뒤 다시 열어 보세요.</p></div>';
+    return;
+  }
+  if (seq !== state.inboxSeq) return;
+  setInboxBadge(data.unread);
+  $('btnReadAll').disabled = !data.unread;
+  $('inboxList').innerHTML = data.items.length ? data.items.map(n => {
+    const unread = !n.read_at;
+    const q = inboxQuery(n);
+    return `<a class="inbox-item${unread ? ' unread' : ''}" href="/${esc(q)}" data-notif="${esc(n.id)}" data-q="${esc(q)}">
+      <span class="inbox-dot" aria-hidden="true"></span>
+      <span class="inbox-icon">${icon(INBOX_ICONS[n.kind] || 'bell')}</span>
+      <span class="grow inbox-text">${unread ? '<span class="sr-only">안 읽음: </span>' : ''}${esc(n.text)}</span>
+      <span class="muted small inbox-time">${esc(timeAgo(n.created_at, data.now))}</span>
+    </a>`;
+  }).join('')
+    : `<div class="card empty-card"><span class="login-mark">${icon('bell', true)}</span><p class="muted">새 소식이 없어요.</p></div>`;
+}
+
+/** 알림 하나 누름: 안 읽었으면 읽음 처리를 마치고 이동 */
+async function openNotification(a) {
+  if (a.classList.contains('unread')) {
+    try { await api(`/api/notifications/${encodeURIComponent(a.dataset.notif)}/read`, { method: 'POST' }); }
+    catch (err) { toast('읽음 표시를 남기지 못했어요: ' + err.message); }
+  }
+  navigate(a.dataset.q);
+}
+
+async function readAllNotifications() {
+  $('btnReadAll').disabled = true;
+  try { await api('/api/notifications/read-all', { method: 'POST' }); setInboxBadge(0); toast('모두 읽음으로 바꿨어요.'); }
+  catch (err) { toast(err.message); }
+  if (!$('inboxView').classList.contains('hidden')) showInbox();
 }
 
 /* ───────────── 방송부 일정 캘린더 ─────────────
@@ -1885,6 +1969,14 @@ function bindEvents() {
   document.querySelectorAll('dialog').forEach(d => d.addEventListener('close', () => {
     if ($('toast').parentElement === d) document.body.appendChild($('toast'));
   }));
+
+  $('btnReadAll').addEventListener('click', readAllNotifications);
+  $('inboxList').addEventListener('click', e => {
+    const a = e.target.closest('a[data-notif]');
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    openNotification(a);
+  });
 
   $('btnHelpBack').addEventListener('click', leaveHelp);
   $('btnHelpStart').addEventListener('click', () => navigate(''));
