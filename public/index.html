@@ -383,7 +383,7 @@
         <ol class="help-steps">
           <li>넓은 화면(컴퓨터)은 화면 <b>맨 위</b>, 좁은 화면(휴대폰)은 화면 <b>맨 아래</b>에 메뉴가 있어요. 지금 보고 있는 메뉴는 빨간색이에요.</li>
           <li><b><i class="ph ph-house"></i> 홈</b>: 인사와 오늘 날짜, <b>이번 주 대본</b> 버튼, <b>내 할 일</b>, <b>새 공지</b>, 그리고 앞으로 있을 <b>다가오는 일정</b>(5개까지)이 한 화면에 모여 있어요. 선생님 화면에는 <b>내 할 일</b> 대신 맨 위에 <b>검토 기다리는 대본</b>이 나와요.
-            <b>내 할 일</b>에는 일주일 안에 방송하는 <span class="badge badge-작성중">작성중</span> 내 대본(내가 만들었거나 아나운서인 대본)과, 내가 함께하는 오늘·내일 일정이 나와요. 누르면 바로 그 대본이나 캘린더 그날이 열려요. 아직 안 읽은 <b>고정 공지</b>도 맨 뒤에 붙어요.
+            <b>내 할 일</b> 맨 위에는 선생님 의견이 남아 있는 내 대본(<b>선생님 의견 n개 반영하기</b>)이 나오고, 그다음 일주일 안에 방송하는 <span class="badge badge-작성중">작성중</span> 내 대본(내가 만들었거나 아나운서인 대본)과, 내가 함께하는 오늘·내일 일정이 나와요. 누르면 바로 그 대본이나 캘린더 그날이 열려요. 아직 안 읽은 <b>고정 공지</b>도 맨 뒤에 붙어요.
             <b>새 공지</b>에는 선생님이 맨 위에 고정한 공지와 최근 공지 3개가 나와요. 아직 안 읽은 공지에는 <span class="badge badge-new">새</span>가 붙어요. 다가오는 일정 중 대본이 있는 날에는 <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>이 붙어요.</li>
           <li><b><i class="ph ph-microphone-stage"></i> 대본</b>: 지금까지 만든 대본 목록이에요. 찾기, 상태로 거르기, <b>다른 날 대본</b> 만들기를 할 수 있어요.</li>
           <li><b><i class="ph ph-calendar-dots"></i> 일정</b>: 방송부 한 달 달력이에요.</li>
@@ -433,6 +433,7 @@
             <span class="demo-row"><span class="btn chip demo">더 짧게</span><span class="btn chip demo">더 길게</span><span class="btn chip demo">더 쉽게</span><span class="btn chip demo">더 재미있게</span><span class="btn chip demo">처음부터 다시</span></span>
             원하는 것이 따로 있으면 <b>직접 부탁하기</b> 칸에 "퀴즈를 하나 넣어 줘"처럼 쓰고 <b>부탁하기</b>를 눌러요.</li>
           <li>2명이 방송하면 대본이 <span class="speaker speaker-0">김방송</span><span class="speaker speaker-1">이아나</span>처럼 이름표로 나뉘어요. 같이 말하는 줄은 <span class="speaker speaker-both">함께</span>예요.</li>
+          <li>탭 이름 옆에 <span class="cm-badge">의견 2</span>가 붙어 있으면 선생님이 그 구성에 <b>의견</b>을 남긴 거예요. 탭을 열면 대본 칸 위에 의견 카드가 보여요. 의견대로 고친 뒤 <span class="btn btn-soft btn-sm demo"><i class="ph ph-check"></i>반영했어요</span>를 눌러요. 반영한 의견은 아래에 흐리게 접혀요.</li>
         </ol>
         <div class="help-tip"><i class="ph ph-cloud-check"></i><span><b>저장 버튼이 없어요.</b> 고치면 몇 초 뒤 저절로 저장돼요. 아래쪽에 <b>자동 저장됨</b>이 보이면 안심해요.</span></div>
       </article>
@@ -441,8 +442,10 @@
         <h3 class="help-title"><span class="h-icon"><i class="ph ph-hand-waving"></i></span>선생님께 검토 받기</h3>
         <ol class="help-steps">
           <li>다 고쳤으면 아래쪽 <span class="btn btn-primary btn-sm demo"><i class="ph ph-hand-waving"></i>검토 요청</span>을 눌러요.</li>
+          <li>선생님은 구성마다 <b>의견</b>을 남겨요. 의견이 오면 홈 <b>내 할 일</b> 맨 위에 <b>선생님 의견 2개 반영하기</b>가 나오고, 대본 목록에도 <span class="badge badge-comment"><i class="ph ph-chat-circle-text"></i>의견 2</span>가 붙어요. 누르면 의견이 있는 탭이 바로 열려요.</li>
+          <li>의견대로 고치고 <span class="btn btn-soft btn-sm demo"><i class="ph ph-check"></i>반영했어요</span>를 눌러요. 다 고쳤으면 다시 <b>검토 요청</b>을 눌러 선생님께 알려요. 의견이 와도 대본 상태는 저절로 바뀌지 않아요.</li>
           <li>선생님이 남긴 <b>메모</b>는 대본 맨 위 파란 칸에 보여요. 메모를 보고 다시 고쳐요.</li>
-          <li>선생님이 <span class="badge badge-완료">완료</span>로 바꾸면 대본이 잠겨요. 이제 읽기만 할 수 있어요.</li>
+          <li>선생님이 <span class="badge badge-완료">완료</span>로 바꾸면 대본이 잠겨요. 이제 읽기만 할 수 있어요. 의견은 그래도 보이고 <b>반영했어요</b>도 누를 수 있어요.</li>
         </ol>
       </article>
 
@@ -502,7 +505,8 @@
         <ul class="help-steps plain-list">
           <li><b>학생 계정</b>: 오른쪽 위 내 이름 버튼을 누르고 <b>학생 계정 관리</b>에서 이름을 한 줄에 한 명씩 넣으면 4자리 임시 비밀번호가 만들어져요. 표를 인쇄해 나눠 주세요.</li>
           <li><b>미리 골라 두기</b>: 이번 주 대본을 먼저 열어 행사와 계기교육 주제를 골라 두면 학생 화면에도 그대로 보여요.</li>
-          <li><b>검토하기</b>: 홈 맨 위 <b>검토 기다리는 대본</b> 카드에 <span class="badge badge-검토요청">검토요청</span> 대본이 방송일 빠른 순으로 모여요(최대 10개). 누르면 그 대본이 열려요. <b>대본</b> 메뉴의 목록에서 상태로 걸러 찾아도 돼요. 4단계의 메모 칸에 피드백을 남겨 주세요.</li>
+          <li><b>검토하기</b>: 홈 맨 위 <b>검토 기다리는 대본</b> 카드에 <span class="badge badge-검토요청">검토요청</span> 대본이 방송일 빠른 순으로 모여요(최대 10개). 누르면 그 대본이 열려요. <b>대본</b> 메뉴의 목록에서 상태로 걸러 찾아도 돼요.</li>
+          <li><b>검토 의견</b>: 4단계에서 고칠 구성 탭을 열고 맨 아래 <b>의견 남기기</b> 칸에 쓴 뒤 <span class="btn btn-primary btn-sm demo"><i class="ph ph-paper-plane-right"></i>남기기</span>를 눌러요(1000자까지). 학생 화면의 그 탭에 <span class="cm-badge">의견 1</span>이 붙고, 학생이 <b>반영했어요</b>를 누르면 의견 아래에 <b>반영함 · 이름 날짜</b>가 보여요. 의견을 남겨도 상태는 <span class="badge badge-검토요청">검토요청</span> 그대로라서, 학생이 고친 뒤 다시 검토 요청해요. 의견은 선생님 누구나 <b>지우기</b>로 지울 수 있고, 대본을 지우면 의견도 함께 지워져요. 저장하기 전 새 대본에는 의견 칸이 보이지 않아요. 전체에 대한 말은 지금처럼 메모 칸에 남겨도 돼요.</li>
           <li><b>공지</b>: <b>게시판</b>이나 홈 <b>새 공지</b> 카드의 <b>공지 쓰기</b>로 올려요. <b>맨 위에 고정</b>을 체크하면 게시판 맨 위와 홈에 늘 보이고(3개까지), 안 읽은 학생의 <b>내 할 일</b>에도 나와요. 공지를 고쳐도 읽음 기록은 그대로라서, 다시 읽어야 할 내용이면 새 공지로 올려 주세요.</li>
           <li><b>읽음 확인</b>: 공지를 펼치면 <b>읽음 12 / 15</b> 버튼이 있어요. 누르면 지금 사용 중인 학생 계정 중 <b>읽은 부원</b>과 <b>아직 안 읽은 부원</b> 이름이 나와요. 홈 새 공지 카드에도 공지마다 읽은 수가 보여요.</li>
           <li><b>글 관리</b>: 선생님이 쓴 공지·메모는 고칠 수 있고, 학생 메모는 고치지 않고 지우기만 할 수 있어요. 지운 글은 되돌릴 수 없어요.</li>

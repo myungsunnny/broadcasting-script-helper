@@ -9,6 +9,7 @@ import { getSpecialTopics } from './commemorations.js';
 import { isValidDate, nextFriday, nowKST, todayKST } from './dates.js';
 import { getHome } from './home.js';
 import { BoardError, listPosts, getPost, createPost, updatePost, deletePost, markRead, postReads } from './board.js';
+import { CommentError, listComments, createComment, resolveComment, deleteComment, deleteCommentsStatement, OPEN_COMMENTS_SQL } from './comments.js';
 import { CalendarError, listCalendar, upcomingEvents, createEvent, updateEvent, deleteEvent, listMembers } from './calendar.js';
 
 const STATUSES = ['작성중', '검토요청', '완료'];
@@ -68,7 +69,8 @@ function checkStatusPermission(user, newStatus, oldStatus) {
 async function listScripts(env, url) {
   const q = (url.searchParams.get('q') || '').trim();
   const status = url.searchParams.get('status') || '';
-  let sql = 'SELECT id, broadcast_date, title, announcers, announcer_count, status, created_by, updated_by, updated_at FROM scripts WHERE 1=1';
+  // open_comments: 반영 안 된 검토 댓글 수 (목록의 '의견 n' 칩)
+  let sql = `SELECT id, broadcast_date, title, announcers, announcer_count, status, created_by, updated_by, updated_at, ${OPEN_COMMENTS_SQL} FROM scripts WHERE 1=1`;
   const args = [];
   if (status) { sql += ' AND status = ?'; args.push(status); }
   if (q) { sql += ' AND (title LIKE ? OR announcers LIKE ? OR created_by LIKE ?)'; args.push(`%${q}%`, `%${q}%`, `%${q}%`); }
@@ -119,6 +121,7 @@ async function deleteScript(env, user, id) {
   if (user.role !== 'teacher') throw new HttpError(403, '대본 삭제는 선생님만 할 수 있어요.');
   await env.DB.batch([
     env.DB.prepare('DELETE FROM script_history WHERE script_id = ?').bind(id),
+    deleteCommentsStatement(env, id),
     env.DB.prepare('DELETE FROM scripts WHERE id = ?').bind(id)
   ]);
   return { ok: true };
@@ -193,6 +196,21 @@ async function handleApi(request, env, url) {
     if (method === 'GET') return json(await getScript(env, m[1]));
     if (method === 'PUT') return json(await updateScript(env, user, m[1], await readBody(request)));
     if (method === 'DELETE') return json(await deleteScript(env, user, m[1]));
+  }
+
+  // ── 검토 댓글 (선생님 의견, 반영했어요) ──
+  const sc = pathname.match(/^\/api\/scripts\/([\w-]+)\/comments$/);
+  const rc = pathname.match(/^\/api\/comments\/([\w-]+)(\/resolve)?$/);
+  if (sc || rc) {
+    try {
+      if (sc && method === 'GET') return json(await listComments(env, sc[1]));
+      if (sc && method === 'POST') return json(await createComment(env, user, sc[1], await readBody(request)), 201);
+      if (rc && rc[2] && method === 'POST') return json(await resolveComment(env, user, rc[1]));
+      if (rc && !rc[2] && method === 'DELETE') return json(await deleteComment(env, user, rc[1]));
+    } catch (err) {
+      if (err instanceof CommentError) throw new HttpError(err.status, err.message);
+      throw err;
+    }
   }
 
   m = pathname.match(/^\/api\/scripts\/([\w-]+)\/history$/);

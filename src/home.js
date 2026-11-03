@@ -1,10 +1,11 @@
 // 홈(첫 화면) 묶음 데이터
-// 이번 주 대본 요약, 내 할 일, 다가오는 일정, 새 공지(고정 공지 + 최근 공지 3개),
+// 이번 주 대본 요약, 내 할 일(선생님 의견 → 대본·일정 → 안 읽은 고정 공지), 다가오는 일정, 새 공지(고정 공지 + 최근 공지 3개),
 // 선생님이면 검토 기다리는 대본을 한 번에 돌려준다.
 
 import { addDays, nextFriday, todayKST } from './dates.js';
 import { toEvent, upcomingStatement } from './calendar.js';
 import { noticeStatements, toNotices } from './board.js';
+import { openCommentStatement, firstSection } from './comments.js';
 
 const UPCOMING_LIMIT = 5;
 const TODO_LIMIT = 5;
@@ -56,7 +57,8 @@ export async function getHome(env, user) {
          WHERE status = '작성중' AND broadcast_date BETWEEN ? AND ? ORDER BY broadcast_date, updated_at DESC`
       ).bind(today, addDays(today, TODO_DAYS)),
       env.DB.prepare('SELECT * FROM calendar_events WHERE date BETWEEN ? AND ? ORDER BY date, time = \'\' DESC, time, created_at')
-        .bind(today, tomorrow)
+        .bind(today, tomorrow),
+      openCommentStatement(env, today)
     );
   }
 
@@ -79,8 +81,14 @@ export async function getHome(env, user) {
     return home;
   }
 
-  const [draftsRes, soonRes] = rest;
-  const scripts = draftsRes.results.filter(s => isMyScript(s, user)).map(s => ({
+  const [draftsRes, soonRes, commentsRes] = rest;
+  // 반영 안 된 선생님 의견이 있는 내 대본('완료' 제외)은 방송일 순으로 맨 위. 누르면 의견이 있는 첫 탭.
+  const commented = commentsRes.results.filter(s => isMyScript(s, user)).map(s => ({
+    kind: 'comments', id: s.id, date: s.broadcast_date, time: '', title: s.title, status: s.status,
+    count: Number(s.n) || 0, section: firstSection(s.sections)
+  }));
+  const commentedIds = new Set(commented.map(c => c.id));
+  const scripts = draftsRes.results.filter(s => isMyScript(s, user) && !commentedIds.has(s.id)).map(s => ({
     kind: 'script', id: s.id, date: s.broadcast_date, time: '', title: s.title, status: s.status
   }));
   const events = soonRes.results.map(toEvent).filter(e => isMember(e, name)).map(e => ({
@@ -97,6 +105,6 @@ export async function getHome(env, user) {
   const unreadPinned = home.notices.filter(n => n.pinned && n.unread).map(n => ({
     kind: 'notice', id: n.id, title: n.title, date: n.created_at.slice(0, 10)
   }));
-  home.todo = [...dated, ...unreadPinned].slice(0, TODO_LIMIT);
+  home.todo = [...commented, ...dated, ...unreadPinned].slice(0, TODO_LIMIT);
   return home;
 }

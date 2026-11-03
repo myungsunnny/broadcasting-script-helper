@@ -11,9 +11,10 @@ const today = todayKST();
 const tomorrow = addDays(today, 1);
 const friday = nextFriday(today);
 
-/** rows: { week, upcoming, scriptDates, review, drafts, soon, pinned, recent, total } → 각 문장이 돌려줄 행 */
+/** rows: { week, upcoming, scriptDates, review, drafts, soon, pinned, recent, total, comments } → 각 문장이 돌려줄 행 */
 function fakeEnv(rows = {}) {
   const pick = sql => {
+    if (sql.includes('FROM script_comments')) return rows.comments || [];
     if (sql.includes('FROM posts')) return sql.includes('p.pinned = 1') ? rows.pinned || [] : rows.recent || [];
     if (sql.includes('FROM users WHERE active = 1')) return rows.total || [{ n: 0 }];
     if (sql.includes('DISTINCT broadcast_date')) return rows.scriptDates || [];
@@ -174,4 +175,33 @@ test('getHome 선생님: 공지마다 readCount/total, unread 없음', async () 
   assert.deepEqual(home.notices.map(n => [n.id, n.readCount, n.total]), [['p1', 4, 15], ['n1', 0, 15]]);
   assert.equal('unread' in home.notices[0], false);
   assert.deepEqual(home.todo, []);
+});
+
+/* ── 선생님 의견 반영하기 (스토리 4) ── */
+
+const commented = (id, date, created_by, announcers, n, sections, status = '검토요청') =>
+  ({ id, broadcast_date: date, title: '대본 ' + id, created_by, announcers, status, n, sections });
+
+test('getHome 학생: 의견 있는 내 대본이 맨 위, 같은 대본의 마저 쓰기 줄은 빠짐, 전체 5개', async () => {
+  const env = fakeEnv({
+    comments: [
+      commented('c1', today, '이서', '', 2, 'special,events', '작성중'),
+      commented('c-other', today, '박하늘', '김방송', 1, 'greeting'), // 남의 대본: 빠짐
+      commented('c2', friday, '박하늘', '이서', 1, 'closing')
+    ],
+    drafts: [draft('c1', today, '이서', ''), draft('d1', today, '이서', ''), draft('d2', tomorrow, '이서', ''), draft('d3', tomorrow, '이서', '')],
+    soon: [ev('e1', today, '10:00', ['이서'])]
+  });
+  const home = await getHome(env, student);
+  assert.deepEqual(home.todo.map(t => [t.kind, t.id]), [['comments', 'c1'], ['comments', 'c2'], ['script', 'd1'], ['event', 'e1'], ['script', 'd2']]);
+  assert.deepEqual(home.todo[0], { kind: 'comments', id: 'c1', date: today, time: '', title: '대본 c1', status: '작성중', count: 2, section: 'events' });
+  assert.equal(home.todo[1].section, 'closing');
+  assert.ok(env.executed.some(sql => sql.includes('FROM script_comments')));
+});
+
+test('getHome 선생님: 의견 문장은 돌리지 않음', async () => {
+  const env = fakeEnv({ comments: [commented('c1', today, '김선생', '', 1, 'greeting')] });
+  const home = await getHome(env, teacher);
+  assert.deepEqual(home.todo, []);
+  assert.equal(env.executed.some(sql => sql.includes('FROM script_comments')), false);
 });

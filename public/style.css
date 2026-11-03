@@ -320,6 +320,30 @@ label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weig
 .sec-nav { display: flex; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); }
 .memo-card label { margin-bottom: 2px; }
 
+/* 검토 댓글: 탭 배지·의견 카드는 --warn 계열(빨강은 알림 배지 전용) */
+.cm-badge, .badge-comment { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; padding: 2px 9px; border-radius: var(--r-pill); white-space: nowrap; background: var(--warn-soft); color: var(--warn); }
+.cm-box { display: grid; gap: 8px; margin: 0 0 12px; }
+.cm-box:empty { display: none; }
+.cm-card { padding: 12px 14px; border-radius: 14px; background: var(--warn-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent); min-width: 0; }
+.cm-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--warn); }
+.cm-head .muted { color: var(--muted); }
+.cm-text { margin: 6px 0 4px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.cm-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cm-actions button { min-height: 44px; }
+.cm-resolved { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--ok); }
+.cm-done { border-radius: 14px; }
+.cm-done summary { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 6px; cursor: pointer; color: var(--muted); font-weight: 600; list-style: none; border-radius: var(--r-pill); }
+.cm-done summary::-webkit-details-marker { display: none; }
+.cm-done[open] summary { margin-bottom: 6px; }
+.cm-done .cm-card { background: var(--surface-2); border-color: var(--line); opacity: .75; margin-bottom: 8px; }
+.cm-done .cm-head { color: var(--muted); }
+.cm-form { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); display: grid; gap: 6px; }
+.cm-form-row { display: flex; gap: 8px; align-items: flex-start; }
+.cm-form-row button { min-height: 44px; flex: none; }
+.cm-input { flex: 1; min-width: 0; min-height: 44px; height: 44px; padding: 9px 14px; line-height: 1.6; resize: none; overflow: hidden; }
+.cm-input:focus, .cm-input:not(:placeholder-shown) { height: auto; min-height: 96px; resize: vertical; overflow: auto; }
+.list-chips { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+
 /* ── 아래 고정 단계 이동 막대 ── */
 .wizard-nav {
   position: sticky; bottom: 12px; z-index: 5; display: flex; gap: 8px; align-items: center;

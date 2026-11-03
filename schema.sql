@@ -81,3 +81,16 @@ CREATE TABLE IF NOT EXISTS post_reads (   -- 공지 읽음 (학생만)
   read_at  TEXT NOT NULL,
   PRIMARY KEY (post_id, user_uid)
 );
+
+-- 검토 댓글: 선생님이 구성마다 남기는 의견과 '반영했어요' 기록
+CREATE TABLE IF NOT EXISTS script_comments (
+  id          TEXT PRIMARY KEY,
+  script_id   TEXT NOT NULL,
+  section     TEXT NOT NULL,           -- greeting / events / idiom / special / closing
+  body        TEXT NOT NULL,
+  created_by  TEXT NOT NULL,           -- 교사 이름
+  created_at  TEXT NOT NULL,
+  resolved_by TEXT NOT NULL DEFAULT '', -- '반영함' 누른 학생 이름 (빈칸 = 아직)
+  resolved_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_comments_script ON script_comments (script_id, created_at);
