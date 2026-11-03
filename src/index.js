@@ -8,6 +8,7 @@ import { getNextWeekEvents } from './weekly-plan.js';
 import { getSpecialTopics } from './commemorations.js';
 import { isValidDate, nextFriday, nowKST, todayKST } from './dates.js';
 import { getHome } from './home.js';
+import { BoardError, listPosts, getPost, createPost, updatePost, deletePost, markRead, postReads } from './board.js';
 import { CalendarError, listCalendar, upcomingEvents, createEvent, updateEvent, deleteEvent, listMembers } from './calendar.js';
 
 const STATUSES = ['작성중', '검토요청', '완료'];
@@ -223,6 +224,29 @@ async function handleApi(request, env, url) {
       if (cm && method === 'DELETE') return json(await deleteEvent(env, user, cm[1]));
     } catch (err) {
       if (err instanceof CalendarError) throw new HttpError(err.status, err.message);
+      throw err;
+    }
+  }
+
+  // ── 게시판 (공지 + 메모, 공지 읽음 확인) ──
+  if (pathname === '/api/posts' || pathname.startsWith('/api/posts/')) {
+    try {
+      if (pathname === '/api/posts') {
+        if (method === 'GET') {
+          return json(await listPosts(env, user, { kind: url.searchParams.get('kind') || '', before: url.searchParams.get('before') || '' }));
+        }
+        if (method === 'POST') return json(await createPost(env, user, await readBody(request)), 201);
+      }
+      const pm = pathname.match(/^\/api\/posts\/([\w-]+)(?:\/(read|reads))?$/);
+      if (pm && !pm[2]) {
+        if (method === 'GET') return json(await getPost(env, user, pm[1]));
+        if (method === 'PUT') return json(await updatePost(env, user, pm[1], await readBody(request)));
+        if (method === 'DELETE') return json(await deletePost(env, user, pm[1]));
+      }
+      if (pm && pm[2] === 'read' && method === 'POST') return json(await markRead(env, user, pm[1]));
+      if (pm && pm[2] === 'reads' && method === 'GET') return json(await postReads(env, user, pm[1]));
+    } catch (err) {
+      if (err instanceof BoardError) throw new HttpError(err.status, err.message);
       throw err;
     }
   }

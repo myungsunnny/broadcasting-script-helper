@@ -11,9 +11,11 @@ const today = todayKST();
 const tomorrow = addDays(today, 1);
 const friday = nextFriday(today);
 
-/** rows: { week, upcoming, scriptDates, review, drafts, soon } → 각 문장이 돌려줄 행 */
+/** rows: { week, upcoming, scriptDates, review, drafts, soon, pinned, recent, total } → 각 문장이 돌려줄 행 */
 function fakeEnv(rows = {}) {
   const pick = sql => {
+    if (sql.includes('FROM posts')) return sql.includes('p.pinned = 1') ? rows.pinned || [] : rows.recent || [];
+    if (sql.includes('FROM users WHERE active = 1')) return rows.total || [{ n: 0 }];
     if (sql.includes('DISTINCT broadcast_date')) return rows.scriptDates || [];
     if (sql.includes('broadcast_date = ?')) return rows.week || [];
     if (sql.includes("'검토요청'")) return rows.review || [];
@@ -26,7 +28,7 @@ function fakeEnv(rows = {}) {
   return {
     executed,
     DB: {
-      prepare: sql => ({ bind: (...args) => ({ sql, args }) }),
+      prepare: sql => ({ sql, args: [], bind: (...args) => ({ sql, args }) }),
       batch: async stmts => stmts.map(s => { executed.push(s.sql); return { results: pick(s.sql) }; })
     }
   };
@@ -117,4 +119,59 @@ test('upcoming: 대본이 있는 날짜에만 hasScript, members는 배열로', 
   }), student);
   assert.deepEqual(home.upcoming.map(e => [e.id, e.hasScript]), [['u1', today === friday], ['u2', true]]);
   assert.deepEqual(home.upcoming[0].members, ['이서']);
+});
+
+/* ── 새 공지 · 안 읽은 고정 공지 (스토리 3) ── */
+
+const notice = (id, created_at, extra = {}) => ({
+  id, kind: 'notice', title: '공지 ' + id, body: '', pinned: 0, created_by: '김선생', created_by_uid: '',
+  created_at, updated_by: '김선생', updated_at: created_at, ...extra
+});
+
+test('getHome 학생: 새 공지 = 고정 먼저 + 최근, unread 표시, 메모 문장은 없음', async () => {
+  const env = fakeEnv({
+    pinned: [notice('p1', '2026-11-01 09:00:00', { pinned: 1, unread: 1 }), notice('p2', '2026-10-01 09:00:00', { pinned: 1, unread: 0 })],
+    recent: [notice('n1', '2026-11-02 09:00:00', { unread: 0 })]
+  });
+  const home = await getHome(env, student);
+  assert.deepEqual(home.notices.map(n => [n.id, n.pinned, n.unread]), [['p1', true, true], ['p2', true, false], ['n1', false, false]]);
+  assert.equal('readCount' in home.notices[0], false);
+  const postSql = env.executed.filter(sql => sql.includes('FROM posts'));
+  assert.equal(postSql.length, 2);
+  assert.ok(postSql.every(sql => sql.includes("p.kind = 'notice'")));
+});
+
+test('getHome 학생: 안 읽은 고정 공지는 대본·일정 뒤에 붙고 전체 5개까지', async () => {
+  const env = fakeEnv({
+    drafts: [draft('s1', today, '이서', ''), draft('s2', tomorrow, '이서', '')],
+    soon: [ev('e1', today, '10:00', ['이서'])],
+    pinned: [
+      notice('p1', '2026-11-01 09:00:00', { pinned: 1, unread: 1 }),
+      notice('p2', '2026-10-30 09:00:00', { pinned: 1, unread: 0 }),
+      notice('p3', '2026-10-29 09:00:00', { pinned: 1, unread: 1 })
+    ],
+    recent: [notice('n1', '2026-11-02 09:00:00', { unread: 1 })] // 고정 아님: 할 일에 안 들어감
+  });
+  const home = await getHome(env, student);
+  assert.deepEqual(home.todo.map(t => t.id), ['s1', 'e1', 's2', 'p1', 'p3']);
+  assert.deepEqual(home.todo[3], { kind: 'notice', id: 'p1', title: '공지 p1', date: '2026-11-01' });
+
+  const full = await getHome(fakeEnv({
+    drafts: [0, 1, 2, 3, 4].map(i => draft('d' + i, addDays(today, i), '이서', '')),
+    pinned: [notice('p1', '2026-11-01 09:00:00', { pinned: 1, unread: 1 })]
+  }), student);
+  assert.equal(full.todo.length, 5);
+  assert.equal(full.todo.some(t => t.kind === 'notice'), false);
+});
+
+test('getHome 선생님: 공지마다 readCount/total, unread 없음', async () => {
+  const env = fakeEnv({
+    pinned: [notice('p1', '2026-11-01 09:00:00', { pinned: 1, readCount: 4 })],
+    recent: [notice('n1', '2026-11-02 09:00:00', { readCount: 0 })],
+    total: [{ n: 15 }]
+  });
+  const home = await getHome(env, teacher);
+  assert.deepEqual(home.notices.map(n => [n.id, n.readCount, n.total]), [['p1', 4, 15], ['n1', 0, 15]]);
+  assert.equal('unread' in home.notices[0], false);
+  assert.deepEqual(home.todo, []);
 });

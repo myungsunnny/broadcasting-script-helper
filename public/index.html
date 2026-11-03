@@ -146,6 +146,7 @@
           <div class="card-head">
             <h3><i class="ph ph-push-pin"></i>새 공지</h3>
             <span class="grow"></span>
+            <button type="button" class="btn-soft btn-sm hidden" id="btnHomeNotice"><i class="ph ph-megaphone"></i>공지 쓰기</button>
             <a href="/?board" class="btn btn-ghost btn-sm" data-go="?board">게시판<i class="ph ph-arrow-right"></i></a>
           </div>
           <div id="noticeList" class="upcoming-list"></div>
@@ -177,16 +178,21 @@
       <div id="listBox" class="list"></div>
     </section>
 
-    <!-- 게시판 (곧 열림) -->
+    <!-- 게시판: 선생님 공지 + 부원 메모 -->
     <section id="boardView" class="hidden">
-      <div class="page-head">
+      <div class="board-head">
         <h2 class="display">게시판</h2>
+        <span class="grow"></span>
+        <button type="button" class="btn-primary hidden" id="btnNewNotice"><i class="ph ph-megaphone"></i>공지 쓰기</button>
+        <button type="button" class="btn-primary" id="btnNewMemo"><i class="ph ph-note-pencil"></i>메모 쓰기</button>
       </div>
-      <div class="card empty-card">
-        <span class="login-mark"><i class="ph-fill ph-push-pin"></i></span>
-        <h3 class="display">곧 열려요</h3>
-        <p class="muted">선생님 공지와 부원 메모를 이곳에서 함께 보게 될 거예요. 조금만 기다려 주세요.</p>
+      <div class="seg board-seg" id="boardTabs" role="group" aria-label="글 종류">
+        <button type="button" data-kind="" class="on" aria-pressed="true">전체</button>
+        <button type="button" data-kind="notice" aria-pressed="false">공지</button>
+        <button type="button" data-kind="memo" aria-pressed="false">메모</button>
       </div>
+      <div id="postList" class="post-list"></div>
+      <div class="board-more"><button type="button" class="btn-ghost hidden" id="btnMorePosts"><i class="ph ph-caret-down"></i>더 보기</button></div>
     </section>
 
     <!-- 알림 (곧 열림) -->
@@ -356,6 +362,7 @@
         <a href="#h-review">검토 받기</a>
         <a href="#h-air">방송하는 날</a>
         <a href="#h-calendar">일정 캘린더</a>
+        <a href="#h-board">게시판</a>
         <a href="#h-promise">AI 약속</a>
         <a href="#h-faq">궁금해요</a>
         <a href="#h-teacher" class="teacher-only">선생님 안내</a>
@@ -376,11 +383,12 @@
         <ol class="help-steps">
           <li>넓은 화면(컴퓨터)은 화면 <b>맨 위</b>, 좁은 화면(휴대폰)은 화면 <b>맨 아래</b>에 메뉴가 있어요. 지금 보고 있는 메뉴는 빨간색이에요.</li>
           <li><b><i class="ph ph-house"></i> 홈</b>: 인사와 오늘 날짜, <b>이번 주 대본</b> 버튼, <b>내 할 일</b>, <b>새 공지</b>, 그리고 앞으로 있을 <b>다가오는 일정</b>(5개까지)이 한 화면에 모여 있어요. 선생님 화면에는 <b>내 할 일</b> 대신 맨 위에 <b>검토 기다리는 대본</b>이 나와요.
-            <b>내 할 일</b>에는 일주일 안에 방송하는 <span class="badge badge-작성중">작성중</span> 내 대본(내가 만들었거나 아나운서인 대본)과, 내가 함께하는 오늘·내일 일정이 나와요. 누르면 바로 그 대본이나 캘린더 그날이 열려요.
-            새 공지는 게시판이 열리면 여기에 보여요. 다가오는 일정 중 대본이 있는 날에는 <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>이 붙어요.</li>
+            <b>내 할 일</b>에는 일주일 안에 방송하는 <span class="badge badge-작성중">작성중</span> 내 대본(내가 만들었거나 아나운서인 대본)과, 내가 함께하는 오늘·내일 일정이 나와요. 누르면 바로 그 대본이나 캘린더 그날이 열려요. 아직 안 읽은 <b>고정 공지</b>도 맨 뒤에 붙어요.
+            <b>새 공지</b>에는 선생님이 맨 위에 고정한 공지와 최근 공지 3개가 나와요. 아직 안 읽은 공지에는 <span class="badge badge-new">새</span>가 붙어요. 다가오는 일정 중 대본이 있는 날에는 <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>이 붙어요.</li>
           <li><b><i class="ph ph-microphone-stage"></i> 대본</b>: 지금까지 만든 대본 목록이에요. 찾기, 상태로 거르기, <b>다른 날 대본</b> 만들기를 할 수 있어요.</li>
           <li><b><i class="ph ph-calendar-dots"></i> 일정</b>: 방송부 한 달 달력이에요.</li>
-          <li><b><i class="ph ph-push-pin"></i> 게시판</b>과 <b><i class="ph ph-bell"></i> 알림</b>은 곧 열려요.</li>
+          <li><b><i class="ph ph-push-pin"></i> 게시판</b>: 선생님 <b>공지</b>와 부원 <b>메모</b>를 함께 봐요. 누구나 메모를 남길 수 있어요.</li>
+          <li><b><i class="ph ph-bell"></i> 알림</b>은 곧 열려요.</li>
           <li>오른쪽 위 <span class="btn btn-ghost btn-sm demo"><i class="ph ph-user-circle"></i>내 이름<i class="ph ph-caret-down"></i></span>을 누르면 학생은 <b>비밀번호 바꾸기</b>, 선생님은 <b>학생 계정 관리</b>가 나오고, <b>사용법</b>과 <b>로그아웃</b>도 함께 나와요.</li>
         </ol>
       </article>
@@ -458,6 +466,17 @@
         <div class="help-tip"><i class="ph ph-lightbulb"></i><span>일정은 방송부 모두가 함께 보고 고칠 수 있어요. 지우기는 만든 사람과 선생님만 할 수 있어요.</span></div>
       </article>
 
+      <article class="card help-card" id="h-board">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-push-pin"></i></span>게시판</h3>
+        <ol class="help-steps">
+          <li>메뉴의 <b><i class="ph ph-push-pin"></i> 게시판</b>을 누르면 선생님 <span class="cat cat-notice">공지</span>와 부원 <span class="cat cat-memo">메모</span>가 최신순으로 보여요. 선생님이 <b>고정</b>한 공지는 늘 맨 위에 있어요.</li>
+          <li>위쪽 <span class="seg demo"><span class="btn on">전체</span><span class="btn">공지</span><span class="btn">메모</span></span>로 보고 싶은 글만 골라 봐요. 글이 많으면 맨 아래 <b>더 보기</b>를 눌러요.</li>
+          <li>글 제목을 누르면 내용이 펼쳐져요. 아직 안 읽은 공지에는 <span class="badge badge-new">새</span>가 붙어 있고, 펼치면 <b>읽음</b>으로 기록돼서 사라져요.</li>
+          <li><span class="btn btn-primary btn-sm demo"><i class="ph ph-note-pencil"></i>메모 쓰기</span>를 눌러 제목과 내용을 쓰면 방송부 모두가 볼 수 있어요. 내가 쓴 메모는 <b>고치기</b>와 <b>지우기</b>를 할 수 있어요.</li>
+        </ol>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>글을 펼치면 주소가 바뀌어요. 그 주소를 친구에게 보내면 같은 글이 바로 열려요.</span></div>
+      </article>
+
       <article class="card help-card promise" id="h-promise">
         <h3 class="help-title"><span class="h-icon"><i class="ph ph-handshake"></i></span>AI와 함께 쓸 때 약속</h3>
         <ul class="promise-list">
@@ -484,6 +503,9 @@
           <li><b>학생 계정</b>: 오른쪽 위 내 이름 버튼을 누르고 <b>학생 계정 관리</b>에서 이름을 한 줄에 한 명씩 넣으면 4자리 임시 비밀번호가 만들어져요. 표를 인쇄해 나눠 주세요.</li>
           <li><b>미리 골라 두기</b>: 이번 주 대본을 먼저 열어 행사와 계기교육 주제를 골라 두면 학생 화면에도 그대로 보여요.</li>
           <li><b>검토하기</b>: 홈 맨 위 <b>검토 기다리는 대본</b> 카드에 <span class="badge badge-검토요청">검토요청</span> 대본이 방송일 빠른 순으로 모여요(최대 10개). 누르면 그 대본이 열려요. <b>대본</b> 메뉴의 목록에서 상태로 걸러 찾아도 돼요. 4단계의 메모 칸에 피드백을 남겨 주세요.</li>
+          <li><b>공지</b>: <b>게시판</b>이나 홈 <b>새 공지</b> 카드의 <b>공지 쓰기</b>로 올려요. <b>맨 위에 고정</b>을 체크하면 게시판 맨 위와 홈에 늘 보이고(3개까지), 안 읽은 학생의 <b>내 할 일</b>에도 나와요. 공지를 고쳐도 읽음 기록은 그대로라서, 다시 읽어야 할 내용이면 새 공지로 올려 주세요.</li>
+          <li><b>읽음 확인</b>: 공지를 펼치면 <b>읽음 12 / 15</b> 버튼이 있어요. 누르면 지금 사용 중인 학생 계정 중 <b>읽은 부원</b>과 <b>아직 안 읽은 부원</b> 이름이 나와요. 홈 새 공지 카드에도 공지마다 읽은 수가 보여요.</li>
+          <li><b>글 관리</b>: 선생님이 쓴 공지·메모는 고칠 수 있고, 학생 메모는 고치지 않고 지우기만 할 수 있어요. 지운 글은 되돌릴 수 없어요.</li>
           <li><b>완료와 삭제</b>: 오른쪽 아래 <b>⋯</b> 메뉴에서 상태를 <span class="badge badge-완료">완료</span>로 바꾸거나 대본을 삭제할 수 있어요.</li>
           <li><b>되돌리기</b>: ⋯ 메뉴의 <b>수정 기록</b>에서 예전 내용을 미리 보고 되돌릴 수 있어요.</li>
         </ul>
@@ -552,6 +574,24 @@
         <button type="button" class="btn-danger hidden" id="btnDeleteEvent"><i class="ph ph-trash"></i>삭제</button>
         <span class="grow"></span>
         <button class="btn-primary" type="submit" id="btnSaveEvent">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 글 쓰기·고치기 창 (게시판) -->
+  <dialog id="postDialog">
+    <form id="postForm">
+      <div class="dialog-head"><h3 id="postDialogTitle"><i class="ph ph-note-pencil"></i>메모 쓰기</h3><button type="button" class="btn-ghost btn-sm" id="btnClosePost">닫기</button></div>
+      <div class="field"><label for="postTitle">제목</label><input id="postTitle" maxlength="60" required placeholder="예: 음향 케이블 정리함 위치"></div>
+      <div class="field">
+        <label for="postBody">내용</label>
+        <textarea id="postBody" maxlength="2000" placeholder="알리고 싶은 내용을 써요. 줄을 바꾸면 그대로 보여요."></textarea>
+        <span class="muted small post-count" id="postBodyCount">0 / 2000</span>
+      </div>
+      <label class="check-row hidden" id="postPinRow"><input type="checkbox" id="postPinned">맨 위에 고정 (공지 3개까지)</label>
+      <div class="dialog-actions">
+        <span class="grow"></span>
+        <button class="btn-primary" type="submit" id="btnSavePost">올리기</button>
       </div>
     </form>
   </dialog>
