@@ -177,7 +177,7 @@ function route() {
   if (params.has('scripts')) return showList();
   // 대본 편집·방송용 보기는 '대본' 메뉴에 속한다.
   if (params.has('new')) { setMenu('scripts'); return newScript(); }
-  if (params.get('id')) { setMenu('scripts'); return openScript(params.get('id')); }
+  if (params.get('id')) { setMenu('scripts'); return openScript(params.get('id'), params.get('tab')); }
   if (location.search) history.replaceState(null, '', '/'); // 학생의 ?accounts 같은 주소는 홈으로
   return showHome();
 }
@@ -288,6 +288,14 @@ function renderHome() {
       title: `공지 읽기: ${t.title}`,
       sub: '고정 공지를 아직 안 읽었어요',
       chip: '<span class="badge badge-new">새</span>'
+    })
+    : t.kind === 'comments'
+    ? homeRow({
+      query: `${scriptQuery(t.id)}&tab=${encodeURIComponent(t.section)}`,
+      date: t.date,
+      title: `선생님 의견 ${t.count}개 반영하기`,
+      sub: `${md(t.date)} 대본${t.title ? ' · ' + t.title : ''}`,
+      chip: `<span class="badge badge-comment">${icon('chat-circle-text')}의견 ${Number(t.count)}</span>`
     })
     : t.kind === 'script'
     ? homeRow({
@@ -987,7 +995,10 @@ function renderList() {
         <div>${esc(s.title) || '(제목 없음)'}</div>
         <div class="muted small list-meta">${icon('microphone')}${esc(s.announcers) || '-'}<span class="sep"></span>${esc(s.updated_by)} ${esc(s.updated_at.slice(5, 16))}</div>
       </div>
-      <span class="badge badge-${esc(s.status)}">${esc(s.status)}</span>
+      <span class="list-chips">
+        ${s.open_comments ? `<span class="badge badge-comment" aria-label="반영 안 된 선생님 의견 ${Number(s.open_comments)}개">${icon('chat-circle-text')}의견 ${Number(s.open_comments)}</span>` : ''}
+        <span class="badge badge-${esc(s.status)}">${esc(s.status)}</span>
+      </span>
     </a>`).join('')
     : `<div class="card muted">${state.scripts.length ? '찾는 대본이 없어요.' : '아직 만든 대본이 없어요. 홈의 이번 주 대본 버튼이나 다른 날 대본을 눌러 시작해요!'}</div>`;
 }
@@ -997,7 +1008,7 @@ function renderList() {
 /** 4단계: 구성 탭과, 탭마다 대본 칸 + AI에게 다시 부탁하는 버튼 */
 function buildSections() {
   $('sectionTabs').innerHTML = SECTIONS.map((s, i) => `
-    <button type="button" data-tab="${s.key}"><span class="tab-dot" id="dot-${s.key}">${i + 1}</span>${s.name}</button>`).join('');
+    <button type="button" data-tab="${s.key}"><span class="tab-dot" id="dot-${s.key}">${i + 1}</span>${s.name}<span class="cm-badge hidden" id="cmb-${s.key}"></span></button>`).join('');
   $('sectionsBox').innerHTML = SECTIONS.map((s, i) => `
     <div class="card sec-card hidden" data-sec="${s.key}">
       <div class="section-head">
@@ -1005,6 +1016,7 @@ function buildSections() {
         <span class="char-count" id="count-${s.key}"></span>
       </div>
       <div class="muted small section-hint">${s.hint}</div>
+      <div class="cm-box" id="cm-${s.key}"></div>
       <textarea id="f-${s.key}" class="script-text" placeholder="여기에 대본이 들어가요. 3단계에서 AI 초안을 만들거나 직접 써요."></textarea>
       <div class="sec-status" id="status-${s.key}"></div>
       <div class="redo">
@@ -1015,6 +1027,13 @@ function buildSections() {
       <div class="redo-custom">
         <input class="ai-req" id="req-${s.key}" placeholder="직접 부탁하기 (예: 퀴즈를 하나 넣어 줘)">
         <button type="button" data-ask="${s.key}">부탁하기</button>
+      </div>
+      <div class="cm-form hidden" id="cmf-${s.key}">
+        <label for="cmi-${s.key}">${icon('chat-circle-text')}${s.name}에 의견 남기기</label>
+        <div class="cm-form-row">
+          <textarea id="cmi-${s.key}" class="cm-input" rows="1" maxlength="1000" placeholder="고칠 점을 써 주세요"></textarea>
+          <button type="button" class="btn-primary" data-cm-add="${s.key}">${icon('paper-plane-right')}남기기</button>
+        </div>
       </div>
       <div class="sec-nav">
         ${i > 0 ? `<button type="button" data-tab="${SECTIONS[i - 1].key}">← ${SECTIONS[i - 1].name}</button>` : ''}
@@ -1039,6 +1058,142 @@ function updateCounts() {
     $('dot-' + s.key).classList.toggle('done', n > 0);
   });
   $('readTime').textContent = total ? ` · 읽는 시간 ${readTimeText(total)}` : '';
+}
+
+/* ── 검토 댓글 (선생님 의견) ──
+   구성 탭마다 반영 안 된 의견 수 배지, 탭 내용 위에 의견 카드(반영 안 된 것 먼저, 반영한 것은 흐리게 접힘).
+   선생님은 탭 아래 입력칸으로 의견을 남기고 지울 수 있다. '반영했어요'는 누구나, 완료된 대본에서도 된다.
+   아직 저장 안 된 새 대본에는 입력칸을 숨긴다(첫 저장 뒤 보임). */
+
+state.comments = { scriptId: null, list: [], seq: 0 };
+
+const isTeacherUser = () => state.user?.role === 'teacher';
+const cmWhen = at => `${md(at.slice(0, 10))} ${at.slice(11, 16)}`;
+
+/** 편집 화면에 대본을 채울 때: 그 대본의 의견을 새로 받는다. id가 없으면(새 대본) 비운다. */
+function startComments(id) {
+  const c = state.comments;
+  c.seq++;
+  c.scriptId = id || null;
+  c.list = [];
+  renderComments();
+  if (id) loadComments(id);
+}
+
+/** 늦게 온 예전 응답(다른 대본, 예전 요청)은 무시한다. */
+async function loadComments(id) {
+  const c = state.comments;
+  const seq = ++c.seq;
+  try {
+    const list = await api('/api/scripts/' + encodeURIComponent(id) + '/comments');
+    if (seq !== c.seq || c.scriptId !== id) return;
+    c.list = list;
+    renderComments();
+  } catch (err) {
+    if (seq !== c.seq || c.scriptId !== id) return;
+    toast('선생님 의견을 불러오지 못했어요: ' + err.message);
+  }
+}
+
+/** 본문은 esc() 뒤 줄바꿈을 그대로 보인다(.cm-text가 pre-wrap). */
+function commentCard(cm, done) {
+  const id = esc(cm.id);
+  const teacher = isTeacherUser();
+  return `
+    <article class="cm-card${done ? ' done' : ''}">
+      <div class="cm-head small">
+        ${icon('chat-circle-text')}<b>${esc(/선생님$/.test(cm.created_by) ? cm.created_by : cm.created_by + ' 선생님')}</b><span class="muted">· ${esc(cmWhen(cm.created_at))}</span>
+      </div>
+      <p class="cm-text">${esc(cm.body)}</p>
+      <div class="cm-actions">
+        ${done
+          ? `<span class="cm-resolved small">${icon('check-circle', true)}반영함 · ${esc(cm.resolved_by)} ${esc(md(cm.resolved_at.slice(0, 10)))}</span>`
+          : `<button type="button" class="btn-soft btn-sm" data-cm-resolve="${id}">${icon('check')}반영했어요</button>`}
+        <span class="grow"></span>
+        ${teacher ? `<button type="button" class="btn-ghost btn-sm" data-cm-delete="${id}">${icon('trash')}지우기</button>` : ''}
+      </div>
+    </article>`;
+}
+
+function renderComments() {
+  const c = state.comments;
+  const canWrite = isTeacherUser() && !!c.scriptId;
+  SECTIONS.forEach(s => {
+    const list = c.list.filter(x => x.section === s.key);
+    const open = list.filter(x => !x.resolved_by);
+    const done = list.filter(x => x.resolved_by);
+    const box = $('cm-' + s.key);
+    const wasOpen = !!box.querySelector('details[open]');
+    box.innerHTML = open.map(x => commentCard(x, false)).join('') + (done.length ? `
+      <details class="cm-done"${wasOpen ? ' open' : ''}>
+        <summary class="small">${icon('check-circle')}반영한 의견 ${done.length}개</summary>
+        ${done.map(x => commentCard(x, true)).join('')}
+      </details>` : '');
+    const badge = $('cmb-' + s.key);
+    badge.textContent = open.length ? `의견 ${open.length}` : '';
+    badge.setAttribute('aria-label', `반영 안 된 의견 ${open.length}개`);
+    badge.classList.toggle('hidden', !open.length);
+    $('cmf-' + s.key).classList.toggle('hidden', !canWrite);
+  });
+}
+
+async function addComment(key) {
+  const input = $('cmi-' + key);
+  const body = input.value.trim();
+  if (!body) return input.focus();
+  const id = state.comments.scriptId;
+  if (!id) return;
+  const btn = document.querySelector(`[data-cm-add="${key}"]`);
+  btn.disabled = true;
+  try {
+    const saved = await api('/api/scripts/' + encodeURIComponent(id) + '/comments', { method: 'POST', body: { section: key, body } });
+    if (state.comments.scriptId !== id) return;
+    input.value = '';
+    state.comments.list.push(saved);
+    sortComments();
+    renderComments();
+    toast('의견을 남겼어요.');
+    loadComments(id); // 처음 받던 목록 응답이 늦게 와서 새 의견을 덮지 않게 새로 받는다
+  } catch (err) { alert(err.message); } finally { btn.disabled = false; }
+}
+
+/** 서버와 같은 순서: 반영 안 된 것 먼저, 그다음 오래된 순 (같은 시각이면 받은 순서 그대로, sort는 안정 정렬) */
+function sortComments() {
+  state.comments.list.sort((a, b) =>
+    (!!a.resolved_by - !!b.resolved_by) || a.created_at.localeCompare(b.created_at));
+}
+
+function replaceComment(saved) {
+  const list = state.comments.list;
+  const i = list.findIndex(x => x.id === saved.id);
+  if (i >= 0) list[i] = saved;
+  sortComments();
+  renderComments();
+}
+
+async function resolveComment(cid, btn) {
+  btn.disabled = true;
+  try {
+    replaceComment(await api('/api/comments/' + encodeURIComponent(cid) + '/resolve', { method: 'POST' }));
+    toast('반영했어요. 선생님 화면에도 반영함으로 보여요.');
+  } catch (err) {
+    btn.disabled = false;
+    alert(err.message);
+    if (err.status === 404 && state.comments.scriptId) loadComments(state.comments.scriptId);
+  }
+}
+
+async function removeComment(cid) {
+  if (!confirm('이 의견을 지울까요? 되돌릴 수 없어요.')) return;
+  try {
+    await api('/api/comments/' + encodeURIComponent(cid), { method: 'DELETE' });
+    state.comments.list = state.comments.list.filter(x => x.id !== cid);
+    renderComments();
+    toast('의견을 지웠어요.');
+  } catch (err) {
+    alert(err.message);
+    if (err.status === 404 && state.comments.scriptId) loadComments(state.comments.scriptId);
+  }
 }
 
 /* ── 4단계 마법사 ── */
@@ -1116,13 +1271,17 @@ async function saveNow() {
   setSaveState('저장 중…', 'cloud-arrow-up');
   try {
     let saved;
-    if (state.current?.id) {
+    const wasNew = !state.current?.id;
+    if (!wasNew) {
       saved = await api('/api/scripts/' + state.current.id, { method: 'PUT', body: { ...d, base_updated_at: state.current.updated_at } });
     } else {
       saved = await api('/api/scripts', { method: 'POST', body: d });
       history.replaceState(null, '', '/?id=' + encodeURIComponent(saved.id));
     }
     state.current = saved;
+    // 새 대본이 처음 저장되면 선생님 의견 칸이 보인다.
+    // (저장 응답 전에 다른 대본을 열었으면 그 대본의 의견 칸은 건드리지 않는다)
+    if (wasNew && !state.comments.scriptId) { state.comments.scriptId = saved.id; renderComments(); }
     if (state.editSeq === seq) state.dirty = false;
     else saveAgain = true; // 저장하는 사이에 또 고쳤으면 한 번 더 저장
     rememberAnnouncers();
@@ -1229,6 +1388,9 @@ function fill(data) {
   $('memoBanner').classList.toggle('hidden', !data.memo);
   $('memoBanner').innerHTML = data.memo ? `${icon('chat-circle-text')}<span><b>메모</b> ${esc(data.memo)}</span>` : '';
 
+  SECTIONS.forEach(s => { $('cmi-' + s.key).value = ''; });
+  startComments(data.id);
+
   state.choices = parseChoices(data.choices);
   $('topic-idiom').value = state.choices.idiom || '';
   loadPickers();
@@ -1268,13 +1430,15 @@ function newScript() {
   }
 }
 
-async function openScript(id) {
+/** tab: 홈 '선생님 의견' 줄에서 오면 의견이 있는 첫 구성 탭(&tab=events)을 바로 연다. */
+async function openScript(id, tab) {
   try {
     fill(await api('/api/scripts/' + encodeURIComponent(id)));
-    state.tab = 'greeting';
+    const pickTab = SECTIONS.some(s => s.key === tab);
+    state.tab = pickTab ? tab : 'greeting';
     showOnly('editView');
     // 이미 대본 내용이 있으면 바로 고치는 단계로, 없으면 처음부터
-    goStep(hasScriptText() ? 4 : 1);
+    goStep(pickTab || hasScriptText() ? 4 : 1);
   } catch (err) {
     alert(err.message);
     navigate('?scripts', true);
@@ -1781,7 +1945,7 @@ function bindEvents() {
 
   // 편집 화면: 무엇이든 고치면 자동 저장 예약
   $('editView').addEventListener('input', e => {
-    if (e.target.matches('.ai-req')) return; // AI에게 부탁할 말은 저장하지 않는다
+    if (e.target.matches('.ai-req, .cm-input')) return; // AI에게 부탁할 말·선생님 의견 입력은 대본에 저장하지 않는다
     if (e.target.matches('input, textarea, select')) markDirty();
     if (e.target.matches('textarea')) updateCounts();
     if (e.target.matches('[data-ev]')) updateEventCount();
@@ -1815,6 +1979,13 @@ function bindEvents() {
     }
     const ai = e.target.closest('[data-ai]');
     if (ai) return aiSection(ai.dataset.ai, { fresh: true });
+    // 검토 댓글
+    const cm = e.target.closest('[data-cm-add], [data-cm-resolve], [data-cm-delete]');
+    if (cm) {
+      if (cm.dataset.cmAdd) return addComment(cm.dataset.cmAdd);
+      if (cm.dataset.cmResolve) return resolveComment(cm.dataset.cmResolve, cm);
+      return removeComment(cm.dataset.cmDelete);
+    }
     const pick = e.target.closest('[data-pick]');
     if (pick) {
       if (pick.dataset.pick === 'reload') {

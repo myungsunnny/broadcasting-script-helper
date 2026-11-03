@@ -27,3 +27,6 @@
 - source_spec: `_bmad-output/specs/spec-club-site/stories/3-board-notices.md`
   summary: 대본 편집의 아나운서 수 버튼(`.big-seg`)과 홈 할 일의 공지 줄을 확인하는 화면 시험이 없다.
   evidence: 게시판 `.seg` 탭이 문서에서 먼저 나와 연결을 `.big-seg`로 바꿨는데, 다시 바뀌어도 잡아낼 시험이 없다. 스토리 1·2의 미룬 화면 시험과 같은 종류다.
+- source_spec: `_bmad-output/specs/spec-club-site/stories/4-review-comments.md`
+  summary: 홈 '선생님 의견' 줄의 `?id=&tab=` 연결, `openScript`의 탭 고르기, 4단계 탭 배지 수(반영 안 된 것만)를 확인하는 화면 시험이 없다.
+  evidence: 저장소에 `public/app.js`를 불러오는 시험 도구가 없다. 서버 쪽 `section`·`count`는 `test/comments.test.js`·`test/home.test.js`가 확인하고, 화면은 로컬 `wrangler dev`에서 사람이 눌러 확인했다.
