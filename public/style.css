@@ -406,6 +406,13 @@ label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weig
 .cat-회의 { background: var(--ok-soft); color: var(--ok); }
 .cat-기타 { background: var(--warn-soft); color: var(--warn); }
 .cat-script { background: var(--surface-2); color: var(--muted); }
+.cat-아침방송 { background: var(--sp1-soft); color: var(--sp1); }
+
+/* 아침방송 담당 창 */
+.duty-week { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; text-align: center; }
+.duty-week button { min-height: 44px; padding: 0 12px; }
+.duty-row { grid-template-columns: 7.5em 1fr; gap: 8px; align-items: center; margin-bottom: 10px; }
+.duty-row select { width: 100%; min-height: 44px; }
 
 .cal-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .cal-head h2 { font-size: 28px; }

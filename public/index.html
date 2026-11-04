@@ -314,10 +314,11 @@
           <button id="calToday">오늘</button>
           <button id="calNext" aria-label="다음 달"><i class="ph ph-caret-right"></i></button>
         </div>
+        <button class="btn-ghost hidden" id="btnMorningDuty"><i class="ph ph-sun-horizon"></i><span>아침방송 담당</span></button>
         <button class="btn-primary" id="btnAddEvent"><i class="ph ph-plus"></i><span>일정 추가</span></button>
       </div>
       <div class="cal-legend">
-        <span class="cat cat-방송">방송</span><span class="cat cat-연습">연습</span><span class="cat cat-회의">회의</span><span class="cat cat-기타">기타</span>
+        <span class="cat cat-방송">방송</span><span class="cat cat-아침방송">아침방송</span><span class="cat cat-연습">연습</span><span class="cat cat-회의">회의</span><span class="cat cat-기타">기타</span>
         <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>
       </div>
 
@@ -464,8 +465,10 @@
           <li>날짜를 누르면 그날 일정이 아래에 자세히 보여요. 대본이 있는 날에는 <span class="cat cat-script"><i class="ph ph-microphone"></i>대본</span>도 함께 보이고, 누르면 그 대본이 열려요.</li>
           <li><span class="btn btn-primary btn-sm demo"><i class="ph ph-plus"></i>일정 추가</span>를 눌러 종류(<span class="cat cat-방송">방송</span> <span class="cat cat-연습">연습</span> <span class="cat cat-회의">회의</span> <span class="cat cat-기타">기타</span>), 이름, 시간, 함께하는 부원, 할 일을 써요.</li>
           <li>일정이 끝나면 <span class="btn btn-soft btn-sm demo"><i class="ph ph-notebook"></i>기록 남기기</span>를 눌러 어떻게 됐는지 적어요. 다음 방송 때 큰 도움이 돼요.</li>
+          <li><span class="cat cat-아침방송">아침방송</span>은 월요일부터 금요일까지 매일 하는 방송의 담당이에요. 내가 담당이 되면 알림이 오고, 오늘·내일 담당이면 홈의 <b>내 할 일</b>에도 나와요.</li>
+          <li class="teacher-only">선생님은 <span class="btn btn-ghost btn-sm demo"><i class="ph ph-sun-horizon"></i>아침방송 담당</span>을 눌러 한 주의 월~금 담당 학생을 한 번에 골라요. 지난주·다음 주로 옮길 수 있고, <b>담당 없음</b>을 고르면 그날 담당이 지워져요.</li>
         </ol>
-        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>일정은 방송부 모두가 함께 보고 고칠 수 있어요. 지우기는 만든 사람과 선생님만 할 수 있어요.</span></div>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>일정은 방송부 모두가 함께 보고 고칠 수 있어요. 지우기는 만든 사람과 선생님만 할 수 있어요. 아침방송 담당은 선생님만 정하고 고칠 수 있어요.</span></div>
       </article>
 
       <article class="card help-card" id="h-board">
@@ -589,6 +592,21 @@
         <span class="grow"></span>
         <button class="btn-primary" type="submit" id="btnSaveEvent">저장</button>
       </div>
+    </form>
+  </dialog>
+
+  <!-- 아침방송 담당 창 (선생님) -->
+  <dialog id="dutyDialog">
+    <form id="dutyForm">
+      <div class="dialog-head"><h3><i class="ph ph-sun-horizon"></i>아침방송 담당</h3><button type="button" class="btn-ghost btn-sm" id="btnCloseDuty">닫기</button></div>
+      <div class="duty-week">
+        <button type="button" class="btn-ghost" id="dutyPrev"><i class="ph ph-caret-left"></i>지난주</button>
+        <b id="dutyRange" class="grow"></b>
+        <button type="button" class="btn-ghost" id="dutyNext">다음 주<i class="ph ph-caret-right"></i></button>
+      </div>
+      <p class="muted small">하루에 한 명씩 골라요. 새로 담당이 된 학생에게 알림이 가요.</p>
+      <div id="dutyRows"></div>
+      <div class="dialog-actions"><span class="grow"></span><button class="btn-primary" type="submit" id="btnSaveDuty">저장</button></div>
     </form>
   </dialog>
 

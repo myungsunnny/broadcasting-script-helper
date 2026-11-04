@@ -713,6 +713,7 @@ state.cal = { month: null, selected: null, events: [], scripts: [], members: nul
 
 async function showCalendar(date) {
   showOnly('calendarView');
+  $('btnMorningDuty').classList.toggle('hidden', state.user.role !== 'teacher');
   const sel = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : (state.cal.selected || localToday());
   state.cal.selected = sel;
   state.cal.month = sel.slice(0, 7);
@@ -788,19 +789,20 @@ function renderDay() {
   const eventRows = events.map(e => {
     const past = e.date <= today;
     const canDelete = isTeacher || (state.user.uid && e.created_by_uid === state.user.uid);
+    const canEdit = isTeacher || e.category !== '아침방송'; // 아침방송 담당은 선생님만 고친다
     return `
     <article class="day-item event-item" data-event="${esc(e.id)}">
       <div class="event-top">
         <span class="cat cat-${esc(e.category)}">${esc(e.category)}</span>
         ${e.time ? `<span class="event-time">${icon('clock')}${esc(e.time)}</span>` : ''}
         <b class="grow">${esc(e.title)}</b>
-        <button type="button" class="btn-ghost btn-sm" data-edit="${esc(e.id)}">${icon('pencil-simple')}<span class="hide-sm">고치기</span></button>
+        ${canEdit ? `<button type="button" class="btn-ghost btn-sm" data-edit="${esc(e.id)}">${icon('pencil-simple')}<span class="hide-sm">고치기</span></button>` : ''}
       </div>
       ${e.members.length ? `<div class="event-members">${icon('users-three')}${e.members.map(m => `<span class="member-tag">${esc(m)}</span>`).join('')}</div>` : ''}
       ${e.note ? `<p class="event-note">${esc(e.note)}</p>` : ''}
       ${e.record
         ? `<div class="event-record">${icon('notebook')}<div><b>기록</b><p>${esc(e.record)}</p></div></div>`
-        : past ? `<button type="button" class="btn-soft btn-sm" data-record="${esc(e.id)}">${icon('notebook')}기록 남기기</button>` : ''}
+        : past && canEdit ? `<button type="button" class="btn-soft btn-sm" data-record="${esc(e.id)}">${icon('notebook')}기록 남기기</button>` : ''}
       <div class="muted small event-meta">${esc(e.created_by)}님이 만듦${e.updated_by !== e.created_by ? `, ${esc(e.updated_by)}님이 고침` : ''}${canDelete ? '' : ''}</div>
     </article>`;
   });
@@ -866,6 +868,7 @@ async function openEventDialog(ev, date, { focusRecord = false } = {}) {
   $('evNote').value = ev?.note || '';
   $('evRecord').value = ev?.record || '';
   setCategory(ev?.category || '연습');
+  $('evCategory').closest('.field').classList.toggle('hidden', ev?.category === '아침방송'); // 담당 창에서만 만드는 종류
   const canDelete = ev && (state.user.role === 'teacher' || (state.user.uid && ev.created_by_uid === state.user.uid));
   $('btnDeleteEvent').classList.toggle('hidden', !canDelete);
   updateRecordVisibility();
@@ -915,6 +918,70 @@ async function removeEvent() {
     toast('일정을 지웠어요.');
     await loadCalendar();
   } catch (err) { alert(err.message); }
+}
+
+/* ── 아침방송 담당 창 (선생님) ──
+   고른 날이 있는 주의 월~금 담당을 한 명씩 골라 한 번에 저장한다. */
+
+async function openDutyDialog() {
+  const d = parseYmd(state.cal.selected || localToday());
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7); // 그 주 월요일 (토·일은 지나간 월요일)
+  state.cal.dutyStart = ymd(d);
+  $('dutyDialog').showModal();
+  await loadDuty();
+}
+
+function dutyDays() {
+  const d = parseYmd(state.cal.dutyStart);
+  return [0, 1, 2, 3, 4].map(n => { const x = new Date(d); x.setDate(d.getDate() + n); return ymd(x); });
+}
+
+async function loadDuty() {
+  const days = dutyDays();
+  const start = state.cal.dutyStart;
+  $('dutyRange').textContent = `${dayLabel(days[0]).split(' (')[0]} ~ ${dayLabel(days[4]).split(' (')[0]}`;
+  $('dutyRows').innerHTML = '';
+  $('btnSaveDuty').disabled = true;
+  let current = {};
+  try {
+    const [r] = await Promise.all([api(`/api/calendar?from=${days[0]}&to=${days[4]}`), loadMembers()]);
+    for (const e of r.events) if (e.category === '아침방송' && !current[e.date]) current[e.date] = e.members[0] || '';
+  } catch (err) { toast('담당을 불러오지 못했어요: ' + err.message); return; }
+  if (state.cal.dutyStart !== start) return; // 그사이 다른 주로 옮김
+  $('dutyRows').innerHTML = days.map(date => {
+    const now = current[date] || '';
+    const names = [...new Set([...state.cal.members, ...(now ? [now] : [])])];
+    return `<div class="field duty-row"><label for="duty-${date}">${dayLabel(date)}</label>
+      <select id="duty-${date}" data-duty="${date}">
+        <option value="">담당 없음</option>
+        ${names.map(n => `<option value="${esc(n)}"${n === now ? ' selected' : ''}>${esc(n)}</option>`).join('')}
+      </select></div>`;
+  }).join('');
+  $('btnSaveDuty').disabled = false;
+}
+
+function moveDutyWeek(delta) {
+  const d = parseYmd(state.cal.dutyStart);
+  d.setDate(d.getDate() + delta * 7);
+  state.cal.dutyStart = ymd(d);
+  loadDuty();
+}
+
+async function saveDuty(e) {
+  e.preventDefault();
+  const duty = {};
+  document.querySelectorAll('#dutyRows [data-duty]').forEach(s => { duty[s.dataset.duty] = s.value; });
+  $('btnSaveDuty').disabled = true;
+  try {
+    await api('/api/calendar/morning', { method: 'PUT', body: { start: state.cal.dutyStart, duty } });
+    $('dutyDialog').close();
+    toast('아침방송 담당을 저장했어요.');
+    await loadCalendar();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    $('btnSaveDuty').disabled = false;
+  }
 }
 
 /* ───────────── 사용법 ───────────── */
@@ -1941,6 +2008,11 @@ function bindEvents() {
   $('eventForm').addEventListener('submit', saveEvent);
   $('btnCloseEvent').addEventListener('click', () => $('eventDialog').close());
   $('btnDeleteEvent').addEventListener('click', removeEvent);
+  $('btnMorningDuty').addEventListener('click', openDutyDialog);
+  $('dutyPrev').addEventListener('click', () => moveDutyWeek(-1));
+  $('dutyNext').addEventListener('click', () => moveDutyWeek(1));
+  $('dutyForm').addEventListener('submit', saveDuty);
+  $('btnCloseDuty').addEventListener('click', () => $('dutyDialog').close());
   // 게시판
   $('boardTabs').addEventListener('click', e => {
     const t = e.target.closest('[data-kind]');
