@@ -26,7 +26,7 @@
       <a href="/?scripts" data-menu="scripts"><i class="ph ph-microphone-stage" aria-hidden="true"></i><span>대본</span></a>
       <a href="/?calendar" data-menu="calendar"><i class="ph ph-calendar-dots" aria-hidden="true"></i><span>일정</span></a>
       <a href="/?board" data-menu="board"><i class="ph ph-push-pin" aria-hidden="true"></i><span>게시판</span></a>
-      <a href="/?inbox" data-menu="inbox"><i class="ph ph-bell" aria-hidden="true"></i><span>알림</span></a>
+      <a href="/?inbox" data-menu="inbox"><i class="ph ph-bell" aria-hidden="true"></i><span>알림</span><span class="nav-badge hidden" id="inboxBadge"></span></a>
     </nav>
     <div id="userBox" class="user-menu hidden">
       <button type="button" class="btn-ghost user-btn" id="btnUser" aria-expanded="false" aria-controls="userPop">
@@ -195,16 +195,14 @@
       <div class="board-more"><button type="button" class="btn-ghost hidden" id="btnMorePosts"><i class="ph ph-caret-down"></i>더 보기</button></div>
     </section>
 
-    <!-- 알림 (곧 열림) -->
+    <!-- 알림: 최근 90일, 최신 50개. 누르면 읽음 처리 후 그 화면으로 -->
     <section id="inboxView" class="hidden">
-      <div class="page-head">
+      <div class="board-head">
         <h2 class="display">알림</h2>
+        <span class="grow"></span>
+        <button type="button" class="btn-ghost" id="btnReadAll"><i class="ph ph-checks"></i>모두 읽음</button>
       </div>
-      <div class="card empty-card">
-        <span class="login-mark"><i class="ph-fill ph-bell"></i></span>
-        <h3 class="display">곧 열려요</h3>
-        <p class="muted">새 공지, 선생님 의견, 나를 넣은 일정 같은 새 소식을 이곳에 모아 보여 줄 거예요.</p>
-      </div>
+      <div id="inboxList" class="post-list"></div>
     </section>
 
     <!-- 대본 만들기 (4단계) -->
@@ -363,6 +361,7 @@
         <a href="#h-air">방송하는 날</a>
         <a href="#h-calendar">일정 캘린더</a>
         <a href="#h-board">게시판</a>
+        <a href="#h-inbox">알림</a>
         <a href="#h-promise">AI 약속</a>
         <a href="#h-faq">궁금해요</a>
         <a href="#h-teacher" class="teacher-only">선생님 안내</a>
@@ -388,7 +387,7 @@
           <li><b><i class="ph ph-microphone-stage"></i> 대본</b>: 지금까지 만든 대본 목록이에요. 찾기, 상태로 거르기, <b>다른 날 대본</b> 만들기를 할 수 있어요.</li>
           <li><b><i class="ph ph-calendar-dots"></i> 일정</b>: 방송부 한 달 달력이에요.</li>
           <li><b><i class="ph ph-push-pin"></i> 게시판</b>: 선생님 <b>공지</b>와 부원 <b>메모</b>를 함께 봐요. 누구나 메모를 남길 수 있어요.</li>
-          <li><b><i class="ph ph-bell"></i> 알림</b>은 곧 열려요.</li>
+          <li><b><i class="ph ph-bell"></i> 알림</b>: 새 공지, 선생님 의견, 나를 넣은 일정 같은 새 소식이 모여요. 안 읽은 알림이 있으면 메뉴에 빨간 숫자가 붙어요.</li>
           <li>오른쪽 위 <span class="btn btn-ghost btn-sm demo"><i class="ph ph-user-circle"></i>내 이름<i class="ph ph-caret-down"></i></span>을 누르면 학생은 <b>비밀번호 바꾸기</b>, 선생님은 <b>학생 계정 관리</b>가 나오고, <b>사용법</b>과 <b>로그아웃</b>도 함께 나와요.</li>
         </ol>
       </article>
@@ -478,6 +477,17 @@
           <li><span class="btn btn-primary btn-sm demo"><i class="ph ph-note-pencil"></i>메모 쓰기</span>를 눌러 제목과 내용을 쓰면 방송부 모두가 볼 수 있어요. 내가 쓴 메모는 <b>고치기</b>와 <b>지우기</b>를 할 수 있어요.</li>
         </ol>
         <div class="help-tip"><i class="ph ph-lightbulb"></i><span>글을 펼치면 주소가 바뀌어요. 그 주소를 친구에게 보내면 같은 글이 바로 열려요.</span></div>
+      </article>
+
+      <article class="card help-card" id="h-inbox">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-bell"></i></span>알림</h3>
+        <ol class="help-steps">
+          <li>메뉴의 <b><i class="ph ph-bell"></i> 알림</b>에 안 읽은 알림 수가 <span class="nav-badge demo">3</span>처럼 빨갛게 붙어요. 화면을 옮길 때마다 새로 세요.</li>
+          <li>이런 때 알림이 와요: 선생님이 <b>새 공지</b>를 올릴 때, 내 대본에 <b>선생님 의견</b>이 달릴 때, 내 대본이 <span class="badge badge-완료">완료</span>될 때, 친구가 일정의 <b>함께하는 부원</b>에 나를 넣을 때.</li>
+          <li>안 읽은 알림은 앞에 빨간 점이 있고 줄 색이 달라요. 누르면 읽음이 되고 그 공지, 대본(의견이 달린 탭), 캘린더 그날이 바로 열려요.</li>
+          <li><span class="btn btn-ghost btn-sm demo"><i class="ph ph-checks"></i>모두 읽음</span>을 누르면 한 번에 다 읽음이 돼요.</li>
+        </ol>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>알림은 최근 90일 것만 50개까지 보여요. 지운 공지·대본·일정의 알림은 함께 사라져요. 선생님에게는 학생이 <b>검토 요청</b>을 하면 알림이 가고, 선생님 알림은 선생님끼리 함께 읽음이 돼요.</span></div>
       </article>
 
       <article class="card help-card promise" id="h-promise">

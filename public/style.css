@@ -171,6 +171,8 @@ label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weig
 .main-nav a:hover { background: var(--surface-2); color: var(--ink); }
 .main-nav a.on { color: var(--accent-ink); }
 .main-nav a.on::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: 4px; height: 2px; border-radius: 2px; background: var(--accent); }
+/* 알림 배지: 빨강(--accent)은 알림 전용 */
+.nav-badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill); background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 800; line-height: 1; }
 
 /* 내 이름 버튼 + 계정 목록 */
 .user-menu { position: relative; flex: none; margin-left: auto; }
@@ -528,6 +530,17 @@ label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weig
 .post-reads { display: grid; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
 .reads-row { display: grid; gap: 6px; }
 .reads-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* 알림 목록: 안 읽은 줄은 빨강 점 + --accent-soft 배경 */
+.inbox-item { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); color: inherit; text-decoration: none; }
+.inbox-item:hover { border-color: var(--accent-soft-2); }
+.inbox-item.unread { background: var(--accent-soft); }
+.inbox-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.inbox-item.unread .inbox-dot { background: var(--accent); }
+.inbox-icon { display: inline-flex; font-size: 20px; color: var(--muted); flex: none; }
+.inbox-text { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+.inbox-item.unread .inbox-text { font-weight: 700; }
+.inbox-time { flex: none; white-space: nowrap; }
 .post-reads .member-tag { background: var(--surface); }
 .board-more { display: flex; justify-content: center; margin-top: 12px; }
 .board-more button { min-height: 44px; }
@@ -683,6 +696,8 @@ dialog::backdrop { background: rgb(18 21 28 / .45); backdrop-filter: blur(2px); 
   .main-nav a { flex-direction: column; gap: 2px; min-height: 56px; padding: 6px 2px; font-size: 12.5px; border-radius: 16px; }
   .main-nav a i { display: block; font-size: 24px; }
   .main-nav a.on::after { display: none; }
+  .main-nav a { position: relative; }
+  .main-nav .nav-badge { position: absolute; top: 2px; left: calc(50% + 6px); }
   /* 하단 막대(약 64px + 안전 영역)에 본문·단계 이동 막대·토스트가 가리지 않게 */
   body.has-nav main { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
   body.has-nav .wizard-nav { bottom: calc(76px + env(safe-area-inset-bottom)); }

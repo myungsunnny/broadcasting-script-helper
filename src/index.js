@@ -10,6 +10,7 @@ import { isValidDate, nextFriday, nowKST, todayKST } from './dates.js';
 import { getHome } from './home.js';
 import { BoardError, listPosts, getPost, createPost, updatePost, deletePost, markRead, postReads } from './board.js';
 import { CommentError, listComments, createComment, resolveComment, deleteComment, deleteCommentsStatement, OPEN_COMMENTS_SQL } from './comments.js';
+import { TEACHER, md, myScriptStudents, notifyStatements, deleteNotificationsStatement, listNotifications, unreadCount, markNotificationRead, markAllNotificationsRead } from './notify.js';
 import { CalendarError, listCalendar, upcomingEvents, createEvent, updateEvent, deleteEvent, listMembers } from './calendar.js';
 
 const STATUSES = ['작성중', '검토요청', '완료'];
@@ -66,6 +67,30 @@ function checkStatusPermission(user, newStatus, oldStatus) {
   if (oldStatus === '완료') throw new HttpError(403, '완료된 대본은 선생님만 고칠 수 있어요. 선생님께 상태를 바꿔 달라고 요청하세요.');
 }
 
+const SCRIPT_NOTICE_KINDS = ['comment', 'done', 'review'];
+
+/**
+ * 상태가 바뀔 때 알림 (저장 batch에 함께 넣는다)
+ * - 학생이 '검토요청'으로 바꾸거나 그 상태로 만들면 선생님 공용 알림
+ * - '완료'가 되면(이미 완료였으면 없음) 그 대본의 '내 대본' 학생에게
+ */
+async function statusNotices(env, user, id, s, oldStatus, createdBy) {
+  if (s.status === oldStatus) return [];
+  if (s.status === '검토요청' && user.role !== 'teacher') {
+    return notifyStatements(env, {
+      recipients: [TEACHER], kind: 'review', refId: id,
+      text: `${user.name}님이 ${md(s.broadcast_date)} 대본 검토를 요청했어요${s.title ? ` (${s.title})` : ''}`
+    });
+  }
+  if (s.status === '완료') {
+    return notifyStatements(env, {
+      recipients: await myScriptStudents(env, { created_by: createdBy, announcers: s.announcers }), kind: 'done', refId: id,
+      text: `${md(s.broadcast_date)} 대본이 완료되었어요${s.title ? ` (${s.title})` : ''}`
+    });
+  }
+  return [];
+}
+
 async function listScripts(env, url) {
   const q = (url.searchParams.get('q') || '').trim();
   const status = url.searchParams.get('status') || '';
@@ -90,10 +115,13 @@ async function createScript(env, user, input) {
   checkStatusPermission(user, s.status, null);
   const id = crypto.randomUUID().slice(0, 8);
   const now = nowKST();
-  await env.DB.prepare(
-    `INSERT INTO scripts (id, broadcast_date, title, announcers, announcer_count, status, ${SECTIONS.join(', ')}, memo, choices, created_by, created_at, updated_by, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ${SECTIONS.map(() => '?').join(', ')}, ?, ?, ?, ?, ?, ?)`
-  ).bind(id, s.broadcast_date, s.title, s.announcers, s.announcer_count, s.status, ...SECTIONS.map(k => s[k]), s.memo, s.choices, user.name, now, user.name, now).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO scripts (id, broadcast_date, title, announcers, announcer_count, status, ${SECTIONS.join(', ')}, memo, choices, created_by, created_at, updated_by, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ${SECTIONS.map(() => '?').join(', ')}, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, s.broadcast_date, s.title, s.announcers, s.announcer_count, s.status, ...SECTIONS.map(k => s[k]), s.memo, s.choices, user.name, now, user.name, now),
+    ...await statusNotices(env, user, id, s, null, user.name)
+  ]);
   return getScript(env, id);
 }
 
@@ -112,7 +140,8 @@ async function updateScript(env, user, id, input) {
     env.DB.prepare(
       `UPDATE scripts SET broadcast_date = ?, title = ?, announcers = ?, announcer_count = ?, status = ?, ${SECTIONS.map(k => `${k} = ?`).join(', ')},
        memo = ?, choices = ?, updated_by = ?, updated_at = ? WHERE id = ?`
-    ).bind(s.broadcast_date, s.title, s.announcers, s.announcer_count, s.status, ...SECTIONS.map(k => s[k]), s.memo, s.choices, user.name, now, id)
+    ).bind(s.broadcast_date, s.title, s.announcers, s.announcer_count, s.status, ...SECTIONS.map(k => s[k]), s.memo, s.choices, user.name, now, id),
+    ...await statusNotices(env, user, id, s, old.status, old.created_by)
   ]);
   return getScript(env, id);
 }
@@ -122,6 +151,7 @@ async function deleteScript(env, user, id) {
   await env.DB.batch([
     env.DB.prepare('DELETE FROM script_history WHERE script_id = ?').bind(id),
     deleteCommentsStatement(env, id),
+    deleteNotificationsStatement(env, SCRIPT_NOTICE_KINDS, id),
     env.DB.prepare('DELETE FROM scripts WHERE id = ?').bind(id)
   ]);
   return { ok: true };
@@ -268,6 +298,13 @@ async function handleApi(request, env, url) {
       throw err;
     }
   }
+
+  // ── 알림 (내 것만: 받는 사람은 서버가 로그인 정보로 정한다) ──
+  if (pathname === '/api/notifications' && method === 'GET') return json(await listNotifications(env, user));
+  if (pathname === '/api/notifications/count' && method === 'GET') return json(await unreadCount(env, user));
+  if (pathname === '/api/notifications/read-all' && method === 'POST') return json(await markAllNotificationsRead(env, user));
+  m = pathname.match(/^\/api\/notifications\/(\d+)\/read$/);
+  if (m && method === 'POST') return json(await markNotificationRead(env, user, m[1]));
 
   if (pathname === '/api/events' && method === 'GET') {
     const date = url.searchParams.get('date');

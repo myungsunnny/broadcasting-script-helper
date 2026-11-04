@@ -151,12 +151,13 @@ test('고치기: 종류는 그대로, 공지 고정 바꾸기, 읽음 기록은 
   assert.equal(upd2.args[2], 0);
 });
 
-test('지우기: 글과 읽음 기록을 같은 batch로', async () => {
+test('지우기: 글과 읽음 기록·알림을 같은 batch로', async () => {
   const env = fakeEnv(() => [], [teacherNotice('n1'), post('m1')]);
   await deletePost(env, teacher, 'n1');
   assert.equal(env.batches.length, 1);
   assert.deepEqual(env.batches[0], [
     { sql: 'DELETE FROM post_reads WHERE post_id = ?', args: ['n1'] },
+    { sql: 'DELETE FROM notifications WHERE ref_id = ? AND kind IN (?)', args: ['n1', 'notice'] },
     { sql: 'DELETE FROM posts WHERE id = ?', args: ['n1'] }
   ]);
   await deletePost(env, student, 'm1'); // 자기 메모
@@ -164,11 +165,12 @@ test('지우기: 글과 읽음 기록을 같은 batch로', async () => {
   await rejects(deletePost(env, teacher, 'none'), 404);
 });
 
-test('deleteUser: 그 학생의 공지 읽음 기록을 같은 batch로 지움', async () => {
+test('deleteUser: 그 학생의 공지 읽음 기록·알림을 같은 batch로 지움', async () => {
   const env = fakeEnv();
   await deleteUser(env, 'u1');
   assert.deepEqual(env.batches, [[
     { sql: 'DELETE FROM post_reads WHERE user_uid = ?', args: ['u1'] },
+    { sql: 'DELETE FROM notifications WHERE recipient = ?', args: ['u1'] },
     { sql: 'DELETE FROM users WHERE id = ?', args: ['u1'] }
   ]]);
 });

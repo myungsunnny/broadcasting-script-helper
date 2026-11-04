@@ -5,6 +5,7 @@
 
 import { SECTIONS } from './ai.js';
 import { nowKST } from './dates.js';
+import { myScriptStudents, notifyStatements, md, SECTION_NAMES } from './notify.js';
 
 const MAX_BODY = 1000;
 const DONE = '완료';
@@ -16,8 +17,9 @@ export class CommentError extends Error {
 const isTeacher = user => user?.role === 'teacher';
 
 async function requireScript(env, scriptId) {
-  const row = await env.DB.prepare('SELECT id FROM scripts WHERE id = ?').bind(scriptId).first();
+  const row = await env.DB.prepare('SELECT id, broadcast_date, created_by, announcers FROM scripts WHERE id = ?').bind(scriptId).first();
   if (!row) throw new CommentError(404, '대본을 찾을 수 없어요.');
+  return row;
 }
 
 async function getRow(env, id) {
@@ -42,11 +44,18 @@ export async function createComment(env, user, scriptId, input) {
   if (!SECTIONS.includes(section)) throw new CommentError(400, '알 수 없는 구성이에요.');
   const body = String(input?.body ?? '').trim().slice(0, MAX_BODY);
   if (!body) throw new CommentError(400, '의견을 써 주세요.');
-  await requireScript(env, scriptId);
+  const script = await requireScript(env, scriptId);
   const id = crypto.randomUUID().slice(0, 8);
-  await env.DB.prepare(
-    'INSERT INTO script_comments (id, script_id, section, body, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(id, scriptId, section, body, user.name, nowKST()).run();
+  // 의견 하나에 알림 하나: 그 대본의 '내 대본' 학생에게. ref_date = 구성 키(누르면 그 탭)
+  await env.DB.batch([
+    env.DB.prepare(
+      'INSERT INTO script_comments (id, script_id, section, body, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(id, scriptId, section, body, user.name, nowKST()),
+    ...notifyStatements(env, {
+      recipients: await myScriptStudents(env, script), kind: 'comment', refId: scriptId, refDate: section,
+      text: `${md(script.broadcast_date)} 대본에 선생님 의견이 달렸어요 (${SECTION_NAMES[section]})`
+    })
+  ]);
   return getRow(env, id);
 }
 
