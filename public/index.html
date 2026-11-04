@@ -289,6 +289,7 @@
         </span>
         <button class="btn-primary" id="btnNext">다음<i class="ph ph-arrow-right"></i></button>
         <button class="btn-ghost hidden" id="btnRead"><i class="ph ph-file-text"></i><span class="hide-sm">방송용 보기</span></button>
+        <button class="btn-ghost hidden btn-practice" id="btnPractice" aria-label="연습하기"><i class="ph ph-timer"></i><span class="hide-sm">연습하기</span></button>
         <button class="btn-primary hidden" id="btnReview"></button>
         <details class="more">
           <summary aria-label="더 보기"><i class="ph ph-dots-three"></i></summary>
@@ -362,6 +363,7 @@
         <a href="#h-calendar">일정 캘린더</a>
         <a href="#h-board">게시판</a>
         <a href="#h-inbox">알림</a>
+        <a href="#h-practice">연습</a>
         <a href="#h-promise">AI 약속</a>
         <a href="#h-faq">궁금해요</a>
         <a href="#h-teacher" class="teacher-only">선생님 안내</a>
@@ -490,6 +492,18 @@
         <div class="help-tip"><i class="ph ph-lightbulb"></i><span>알림은 최근 90일 것만 50개까지 보여요. 지운 공지·대본·일정의 알림은 함께 사라져요. 선생님에게는 학생이 <b>검토 요청</b>을 하면 알림이 가고, 선생님 알림은 선생님끼리 함께 읽음이 돼요.</span></div>
       </article>
 
+      <article class="card help-card" id="h-practice">
+        <h3 class="help-title"><span class="h-icon"><i class="ph ph-timer"></i></span>낭독 연습</h3>
+        <ol class="help-steps">
+          <li>4단계 아래쪽이나 방송용 보기 위쪽의 <span class="btn btn-ghost btn-sm demo"><i class="ph ph-timer"></i>연습하기</span>를 눌러요. 고치던 내용은 저장한 뒤 지금 화면 그대로 연습해요. 대본이 비어 있으면 누를 수 없어요.</li>
+          <li>메뉴가 사라지고 어두운 화면에 큰 글씨로 구성이 하나씩 나와요. 비어 있는 구성은 건너뛰어요. <b>가- 가+</b>로 글자 크기를 바꾸면 이 기기에 기억돼요.</li>
+          <li>2명이 방송하면 먼저 <b>나는 누구예요?</b>에서 내 이름을 골라요. 내 대사는 진하게, 친구 대사는 흐리게 보여요. <b>둘 다</b>를 고르면 모두 똑같이 보여요.</li>
+          <li><span class="btn btn-primary btn-sm demo"><i class="ph-fill ph-play"></i>시작</span>을 누르고 소리 내어 읽어요. 다 읽으면 <b>다음</b>을 눌러요. 구성마다 시간이 따로 재져요. 키보드로는 <b>스페이스</b> 시작/멈춤, <b>화살표</b> 이전/다음, <b>Esc</b> 끝내기예요.</li>
+          <li>마지막 구성에서 <b>마치기</b>를 누르면 구성마다 <b>실제</b> 걸린 시간, 글자 수로 어림한 <b>예상</b> 시간, <b>차이</b>가 나와요. 너무 빨리 읽었으면 <span class="badge badge-검토요청">조금 천천히</span>, 너무 느리면 <span class="badge badge-검토요청">조금 빠르게</span>, 딱 좋으면 <span class="badge badge-완료">알맞아요</span>가 붙어요.</li>
+        </ol>
+        <div class="help-tip"><i class="ph ph-lightbulb"></i><span>연습 결과는 저장하지 않아요. <b>다시 연습</b>으로 몇 번이든 해 보고, 끝나면 <b>대본으로 돌아가기</b>를 눌러요. 연습하는 동안 화면이 꺼지지 않아요(지원하는 브라우저만).</span></div>
+      </article>
+
       <article class="card help-card promise" id="h-promise">
         <h3 class="help-title"><span class="h-icon"><i class="ph ph-handshake"></i></span>AI와 함께 쓸 때 약속</h3>
         <ul class="promise-list">
@@ -535,6 +549,7 @@
       <div class="page-head no-print">
         <button class="btn-ghost" id="btnBackToEdit"><i class="ph ph-arrow-left"></i>편집으로</button>
         <span class="grow"></span>
+        <button class="btn-ghost btn-practice" id="btnPracticeRead"><i class="ph ph-timer"></i><span>연습하기</span></button>
         <button class="btn-ghost" id="btnCopyText"><i class="ph ph-copy"></i><span class="hide-sm">글자 복사</span></button>
         <button class="btn-ghost" onclick="window.print()"><i class="ph ph-printer"></i><span class="hide-sm">인쇄</span></button>
         <div class="seg font-seg" role="group" aria-label="글자 크기">
@@ -544,6 +559,10 @@
       </div>
       <div class="card reading" id="readBox"></div>
     </section>
+
+    <!-- 낭독 연습 모드: 메뉴 없는 전체 화면 (내용은 app.js의 renderPractice가 그린다) -->
+    <section id="practiceView" class="practice hidden" aria-label="낭독 연습"></section>
+    <div id="prLive" class="sr-only" aria-live="polite"></div>
   </main>
 
   <!-- 수정 기록 창 -->
@@ -623,6 +642,7 @@
   </dialog>
 
   <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/practice.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

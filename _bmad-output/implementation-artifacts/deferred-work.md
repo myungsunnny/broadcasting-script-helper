@@ -33,3 +33,6 @@
 - source_spec: `_bmad-output/specs/spec-club-site/stories/5-inbox.md`
   summary: 알림 줄의 이동 주소(`inboxQuery`: 의견은 `&tab=`, 일정은 `?calendar&date=`), '몇 분 전'(`timeAgo`), 메뉴 배지 수를 확인하는 화면 시험이 없다.
   evidence: 저장소에 `public/app.js`를 불러오는 시험 도구가 없다. 서버의 `ref_date`(구성 키·날짜)는 `test/notify.test.js`가 확인하고, 화면은 로컬 `wrangler dev`에서 눌러 확인했다. `inboxQuery`·`timeAgo`를 작은 모듈로 빼면 `node:test`로 시험할 수 있다.
+- source_spec: `_bmad-output/specs/spec-club-site/stories/6-practice-mode.md`
+  summary: 낭독 연습의 구성별 시간 쌓기(넘길 때 앞 구성에 기록, 멈춘 시간 제외, 다시 연습 초기화)를 확인하는 시험이 없다.
+  evidence: 상태 전이(`practiceFlush`·`practiceMove`·`practiceRestart`)가 `public/app.js`에 있어 `node:test`가 부를 수 없다. `now`를 받는 순수 함수로 `public/practice.js`에 옮기면 `test/practice.test.js`에 넣을 수 있다. 이번엔 로컬 화면에서 눌러 확인했다.
