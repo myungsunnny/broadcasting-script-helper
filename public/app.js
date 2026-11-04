@@ -48,7 +48,10 @@ function toast(msg) {
 }
 
 function showOnly(id) {
-  ['loginView', 'homeView', 'listView', 'boardView', 'inboxView', 'editView', 'readView', 'accountsView', 'helpView', 'calendarView'].forEach(v => $(v).classList.toggle('hidden', v !== id));
+  ['loginView', 'homeView', 'listView', 'boardView', 'inboxView', 'editView', 'readView', 'accountsView', 'helpView', 'calendarView', 'practiceView'].forEach(v => $(v).classList.toggle('hidden', v !== id));
+  // 연습 모드는 메뉴 없는 전체 화면. 다른 화면으로 가면 타이머·화면 꺼짐 방지를 멈춘다.
+  document.body.classList.toggle('practicing', id === 'practiceView');
+  if (id !== 'practiceView') stopPractice();
   window.scrollTo(0, 0);
 }
 
@@ -165,6 +168,8 @@ function route() {
   toggleUserMenu(false);
   syncNav();
   setMenu(null);
+  // 연습에서 뒤로 가면 다음 화면을 받기 전에 타이머·키·Wake Lock부터 멈춘다.
+  if (!params.get('practice')) stopPractice();
   // 사용법은 로그인하지 않아도 볼 수 있다.
   if (params.has('help')) return showHelp();
   if (!state.user) return showLogin();
@@ -181,6 +186,7 @@ function route() {
   // 대본 편집·방송용 보기는 '대본' 메뉴에 속한다.
   if (params.has('new')) { setMenu('scripts'); return newScript(); }
   if (params.get('id')) { setMenu('scripts'); return openScript(params.get('id'), params.get('tab')); }
+  if (params.get('practice')) { setMenu('scripts'); return showPractice(params.get('practice')); }
   if (location.search) history.replaceState(null, '', '/'); // 학생의 ?accounts 같은 주소는 홈으로
   return showHome();
 }
@@ -1142,6 +1148,11 @@ function updateCounts() {
     $('dot-' + s.key).classList.toggle('done', n > 0);
   });
   $('readTime').textContent = total ? ` · 읽는 시간 ${readTimeText(total)}` : '';
+  document.querySelectorAll('.btn-practice').forEach(b => {
+    b.disabled = !total;
+    b.querySelector('span').textContent = total ? '연습하기' : '대본을 먼저 써요';
+    b.setAttribute('aria-label', b.querySelector('span').textContent);
+  });
 }
 
 /* ── 검토 댓글 (선생님 의견) ──
@@ -1296,6 +1307,7 @@ function goStep(n) {
   $('btnPrev').classList.toggle('invisible', n === 1);
   $('btnNext').classList.toggle('hidden', n === 4);
   $('btnRead').classList.toggle('hidden', n !== 4);
+  $('btnPractice').classList.toggle('hidden', n !== 4);
   $('btnReview').classList.toggle('hidden', n !== 4 || state.user.role === 'teacher' || state.locked);
   if (n === 3) {
     $('btnAll').innerHTML = icon('sparkle') + (hasScriptText() ? '초안 다시 만들기' : '대본 초안 만들기');
@@ -1809,7 +1821,7 @@ async function aiAll() {
 /** "이름: 대사" 줄의 이름에 아나운서별 색 이름표를 붙인다. */
 function formatSpeech(text, names) {
   return String(text).split('\n').map(line => {
-    const m = line.match(/^\s*([^:：]{1,20}?)\s*[:：]\s*(.*)$/);
+    const m = line.match(SPEAKER_RE);
     if (!m) return esc(line);
     const idx = names.indexOf(m[1].trim());
     const cls = m[1].trim() === '함께' ? 'speaker-both' : idx >= 0 ? `speaker-${idx}` : null;
@@ -1838,6 +1850,248 @@ function changeFont(delta) {
   const next = Math.min(40, Math.max(14, cur + delta));
   $('readBox').style.setProperty('--read-size', next + 'px');
   try { localStorage.setItem('readSize', next); } catch {}
+}
+
+/* ───────────── 낭독 연습 모드 (?practice=<id>) ─────────────
+   빈 구성은 건너뛰고 구성을 하나씩 큰 글씨로 보여 주며 구성마다 따로 시간을 잰다.
+   끝 화면에 구성별 실제/예상/차이와 합계. 결과는 저장하지 않는다.
+   단계(stage): pick(2인 이상이면 나 고르기) → run → end, 내용이 없으면 empty */
+
+const PRACTICE_SIZE = 'practiceSize';
+let practiceSeq = 0;
+state.practice = null;
+state.practiceDraft = null; // 편집 화면에서 들어올 때 지금 화면의 내용
+
+const practiceNow = () => performance.now() / 1000;
+
+/** 편집 화면·방송용 보기의 [연습하기]: 저장한 뒤 지금 화면의 내용으로 연습한다. */
+async function startPractice() {
+  if (state.dirty) await saveNow();
+  // 저장이 안 됐으면(실패·저장 중) 돌아올 때 고친 내용을 잃으니 시작하지 않는다.
+  if (state.dirty) return toast('저장한 뒤에 연습할 수 있어요. 잠시 뒤 다시 눌러 주세요.');
+  const id = state.current?.id;
+  if (!id) return toast('대본을 먼저 저장해 주세요. 방송일이 있어야 저장돼요.');
+  state.practiceDraft = { id, data: collect() };
+  navigate('?practice=' + encodeURIComponent(id));
+}
+
+async function showPractice(id) {
+  stopPractice();
+  const seq = ++practiceSeq;
+  const draft = state.practiceDraft?.id === id ? state.practiceDraft : null;
+  state.practiceDraft = null;
+  let data = draft?.data;
+  if (!data) {
+    try { data = await api('/api/scripts/' + encodeURIComponent(id)); }
+    catch (err) {
+      if (seq !== practiceSeq) return;
+      alert(err.message);
+      return navigate('?scripts', true);
+    }
+    if (seq !== practiceSeq) return; // 그사이 다른 화면으로 갔다
+  }
+  const names = splitNames(data.announcers);
+  const items = SECTIONS.filter(s => String(data[s.key] || '').trim()).map(s => {
+    const text = String(data[s.key]).trim();
+    return { name: s.name, text, expected: text.replace(/\s/g, '').length / CHARS_PER_SECOND };
+  });
+  let size = 32;
+  try { size = Number(localStorage.getItem(PRACTICE_SIZE)) || 32; } catch {}
+  state.practice = {
+    id, names, items, i: 0, times: items.map(() => 0), running: false, startAt: 0, wake: null,
+    me: names.length > 1 ? null : '', // null: 아직 안 고름, '': 강조 없음(1인·둘 다)
+    stage: !items.length ? 'empty' : names.length > 1 ? 'pick' : 'run',
+    tick: setInterval(practiceClock, 250)
+  };
+  $('practiceView').style.setProperty('--pr-size', Math.min(56, Math.max(20, size)) + 'px');
+  showOnly('practiceView');
+  renderPractice();
+  practiceWake();
+}
+
+/** 다른 화면으로 갈 때(showOnly) 부른다: 타이머·Wake Lock 정리 */
+function stopPractice() {
+  practiceSeq++; // 받는 중인 대본 응답도 버린다
+  const P = state.practice;
+  if (!P) return;
+  $('prLive').textContent = '';
+  clearInterval(P.tick);
+  P.wake?.release().catch(() => {});
+  state.practice = null;
+}
+
+/** 화면 꺼짐 방지: 지원하는 브라우저만, 실패는 조용히 무시. 탭을 다시 보면 새로 건다. */
+async function practiceWake() {
+  const P = state.practice;
+  if (!P || !navigator.wakeLock || document.visibilityState !== 'visible') return;
+  try {
+    const lock = await navigator.wakeLock.request('screen');
+    if (state.practice === P) { P.wake?.release().catch(() => {}); P.wake = lock; }
+    else lock.release().catch(() => {});
+  } catch { /* 지원 안 함·거절 */ }
+}
+
+const practiceElapsed = k => {
+  const P = state.practice;
+  return P.times[k] + (P.running && k === P.i ? practiceNow() - P.startAt : 0);
+};
+
+/** 지금 구성에 흐른 시간을 쌓는다(재는 중이면 이어서 잰다). */
+function practiceFlush() {
+  const P = state.practice;
+  if (!P.running) return;
+  const t = practiceNow();
+  P.times[P.i] += t - P.startAt;
+  P.startAt = t;
+}
+
+function practiceClock() {
+  const P = state.practice;
+  const el = $('prClock');
+  if (P && el) el.textContent = clockText(practiceElapsed(P.i));
+}
+
+function practiceToggle() {
+  const P = state.practice;
+  practiceFlush();
+  P.running = !P.running;
+  P.startAt = practiceNow();
+  renderPractice();
+}
+
+/** 다음(+1)/이전(-1). 첫 구성에서 이전은 무시, 마지막에서 다음은 끝 화면. */
+function practiceMove(d) {
+  const P = state.practice;
+  if (d < 0 && P.i === 0) return;
+  practiceFlush();
+  if (d > 0 && P.i === P.items.length - 1) { P.running = false; P.stage = 'end'; }
+  else P.i += d;
+  renderPractice();
+}
+
+function practiceRestart() {
+  const P = state.practice;
+  Object.assign(P, { i: 0, times: P.items.map(() => 0), running: false, stage: P.me === null ? 'pick' : 'run' });
+  renderPractice();
+}
+
+function practiceFont(delta) {
+  const view = $('practiceView');
+  const next = Math.min(56, Math.max(20, (parseInt(view.style.getPropertyValue('--pr-size')) || 32) + delta));
+  view.style.setProperty('--pr-size', next + 'px');
+  try { localStorage.setItem(PRACTICE_SIZE, next); } catch {}
+}
+
+const leavePractice = () => navigate(scriptQuery(state.practice.id), true);
+
+/** 줄마다 내 줄(진하게)·남의 줄(흐리게). 강조 없음이면 보통. */
+function practiceText(item) {
+  const P = state.practice;
+  const owners = lineOwners(item.text, P.names);
+  return formatSpeech(item.text, P.names).split('\n').map((html, k) => {
+    const cls = !P.me || !owners[k] ? '' : owners[k] === P.me ? ' mine' : ' other';
+    return `<p class="pr-line${cls}">${html || '&nbsp;'}</p>`;
+  }).join('');
+}
+
+const diffText = sec => { const r = Math.round(sec); return (r < 0 ? '-' : '+') + clockText(Math.abs(r)); };
+const hintBadge = (actual, expected) => {
+  const h = paceHint(actual, expected);
+  return h ? `<span class="badge ${h === '알맞아요' ? 'badge-완료' : 'badge-검토요청'}">${h}</span>` : '';
+};
+
+function renderPractice() {
+  const P = state.practice;
+  const view = $('practiceView');
+  const focused = view.contains(document.activeElement) ? document.activeElement.dataset.pr : null;
+  const head = (title, font = false) => `
+    <div class="pr-head">
+      <button type="button" class="btn-ghost" data-pr="exit">${icon('x')}끝내기</button>
+      <h2 class="pr-title display">${title}</h2>
+      ${font ? `<div class="seg font-seg" role="group" aria-label="글자 크기">
+        <button type="button" data-pr="smaller" aria-label="글자 작게">가-</button>
+        <button type="button" data-pr="bigger" aria-label="글자 크게">가+</button>
+      </div>` : '<span class="pr-head-end"></span>'}
+    </div>`;
+  const back = `<button type="button" class="btn-primary btn-lg" data-pr="exit">${icon('arrow-left')}대본으로 돌아가기</button>`;
+
+  if (P.stage === 'empty') {
+    view.innerHTML = head('낭독 연습') + `<div class="pr-body pr-center">
+      <span class="login-mark">${icon('timer', true)}</span>
+      <p class="pr-msg">연습할 내용이 없어요</p>${back}</div>`;
+  } else if (P.stage === 'pick') {
+    view.innerHTML = head('낭독 연습') + `<div class="pr-body pr-center">
+      <p class="pr-msg">나는 누구예요?</p>
+      <div class="pr-picks">
+        ${P.names.map((n, k) => `<button type="button" class="btn-lg" data-pr="me" data-me="${k}">${icon('user')}${esc(n)}</button>`).join('')}
+        <button type="button" class="btn-lg" data-pr="me" data-me="">${icon('users')}둘 다</button>
+      </div>
+      <p class="muted small">고른 사람의 대사는 진하게, 다른 사람의 대사는 흐리게 보여요.</p></div>`;
+  } else if (P.stage === 'run') {
+    const it = P.items[P.i];
+    const last = P.i === P.items.length - 1;
+    view.innerHTML = head(`${esc(it.name)} <span class="pr-count">(${P.i + 1}/${P.items.length})</span>`, true) + `
+      <div class="pr-body"><div class="pr-text">${practiceText(it)}</div></div>
+      <div class="pr-foot">
+        <div class="pr-time${P.running ? ' running' : ''}">
+          ${P.running ? `<span class="pr-live">${icon('record', true)}재는 중</span>` : ''}
+          <b id="prClock">${clockText(practiceElapsed(P.i))}</b><span class="muted"> / 예상 ${clockText(it.expected)}</span>
+        </div>
+        <div class="pr-buttons">
+          <button type="button" data-pr="prev"${P.i === 0 ? ' disabled' : ''}>${icon('caret-left')}이전</button>
+          <button type="button" class="btn-primary" data-pr="toggle">${P.running ? icon('pause', true) + '멈춤' : icon('play', true) + '시작'}</button>
+          <button type="button" data-pr="next">${last ? icon('flag-checkered') + '마치기' : '다음' + icon('caret-right')}</button>
+        </div>
+        <p class="muted small pr-keys">스페이스 시작/멈춤 · 화살표 이전/다음 · Esc 끝내기</p>
+      </div>`;
+  } else {
+    const total = P.times.reduce((a, b) => a + b, 0);
+    const expected = P.items.reduce((a, it) => a + it.expected, 0);
+    const row = (name, a, e, tag = 'td') => `<tr><${tag === 'th' ? 'th scope="row"' : 'td'}>${name}</${tag}><td>${clockText(a)}</td><td>${clockText(e)}</td>
+      <td>${diffText(a - e)} ${hintBadge(a, e)}</td></tr>`;
+    view.innerHTML = head('연습 끝') + `<div class="pr-body"><div class="pr-end card">
+      <table class="table pr-table">
+        <thead><tr><th>구성</th><th>실제</th><th>예상</th><th>차이</th></tr></thead>
+        <tbody>${P.items.map((it, k) => row(esc(it.name), P.times[k], it.expected)).join('')}</tbody>
+        <tfoot>${row('합계', total, expected, 'th')}</tfoot>
+      </table>
+      <p class="muted small">결과는 저장하지 않아요. 예상 시간은 글자 수로 어림한 거예요.</p>
+      <div class="pr-end-actions">
+        <button type="button" class="btn-ghost btn-lg" data-pr="again">${icon('arrow-counter-clockwise')}다시 연습</button>
+        ${back}
+      </div></div></div>`;
+  }
+  // 화면 읽기 프로그램에 구성이 바뀐 것을 알린다(다시 그리지 않는 바깥 칸)
+  $('prLive').textContent = view.querySelector('.pr-title').textContent;
+  // 다시 그려도 누르던 버튼에 초점을 둔다(키보드 사용자). 처음이면 주요 버튼에.
+  const target = (focused && view.querySelector(`[data-pr="${focused}"]:not(:disabled)`)) ||
+    view.querySelector('[data-pr="toggle"], [data-pr="me"], .btn-primary[data-pr="exit"]');
+  target?.focus();
+}
+
+function practiceClick(e) {
+  const b = e.target.closest('[data-pr]');
+  const P = state.practice;
+  if (!b || !P) return;
+  const act = b.dataset.pr;
+  if (act === 'exit') return leavePractice();
+  if (act === 'smaller' || act === 'bigger') return practiceFont(act === 'bigger' ? 4 : -4);
+  if (act === 'me') { P.me = b.dataset.me === '' ? '' : P.names[b.dataset.me]; P.stage = 'run'; return renderPractice(); }
+  if (act === 'toggle') return practiceToggle();
+  if (act === 'prev') return practiceMove(-1);
+  if (act === 'next') return practiceMove(1);
+  if (act === 'again') return practiceRestart();
+}
+
+/** 스페이스 = 시작/멈춤, → 다음, ← 이전, Esc = 끝내기 */
+function practiceKey(e) {
+  const P = state.practice;
+  if (!P || e.ctrlKey || e.metaKey || e.altKey || document.querySelector('dialog[open]')) return;
+  if (e.key === 'Escape') { e.preventDefault(); return leavePractice(); }
+  if (P.stage !== 'run') return;
+  if (e.key === ' ') { e.preventDefault(); if (!e.repeat) practiceToggle(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); practiceMove(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); practiceMove(-1); }
 }
 
 /* ───────────── 수정 기록 ───────────── */
@@ -2112,6 +2366,10 @@ function bindEvents() {
   $('btnBackToEdit').addEventListener('click', () => showOnly('editView'));
   $('btnCopyText').addEventListener('click', () => copy(scriptText(collect()), '대본을 복사했어요.'));
   $('btnFontUp').addEventListener('click', () => changeFont(2));
+  document.querySelectorAll('.btn-practice').forEach(b => b.addEventListener('click', startPractice));
+  $('practiceView').addEventListener('click', practiceClick);
+  document.addEventListener('keydown', practiceKey);
+  document.addEventListener('visibilitychange', () => { if (state.practice && document.visibilityState === 'visible') practiceWake(); });
   $('btnFontDown').addEventListener('click', () => changeFont(-2));
   try { const size = localStorage.getItem('readSize'); if (size) $('readBox').style.setProperty('--read-size', size + 'px'); } catch {}
 
