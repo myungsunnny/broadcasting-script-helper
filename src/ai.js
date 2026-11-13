@@ -3,6 +3,7 @@
 import { getNextWeekEvents } from './weekly-plan.js';
 import { getSpecialTopics } from './commemorations.js';
 import { nextWeekRange } from './dates.js';
+import { getUsedTopics, topicKey, avoidRule, splitTopicLine } from './used-topics.js';
 
 export const SECTIONS = ['greeting', 'events', 'idiom', 'special', 'closing'];
 
@@ -203,9 +204,13 @@ ${ctx.candidates.map(c => `- ${c}`).join('\n')}`;
  * 계기교육 후보: 방송일 이후 2주 안의 기념일 + 다음 주 학교 주간계획에 있는 교육주간·캠페인.
  * 방송일보다 지난 날은 넣지 않는다.
  */
-async function specialCandidates(env, date) {
+async function specialCandidates(env, date, used) {
   // 주제를 고르지 않았을 때는 날짜가 정해진 후보(기념일·학교 계획)만 AI에 준다.
-  return (await getSpecialTopics(env, date)).filter(t => t.kind !== '계절').map(t => t.label);
+  const all = (await getSpecialTopics(env, date)).filter(t => t.kind !== '계절').map(t => t.label);
+  // 이번 학년도에 이미 쓴 주제는 빼되, 다 빠지면 그대로 둔다.
+  const usedKeys = new Set(used.map(u => topicKey(u.topic)));
+  const fresh = all.filter(l => !usedKeys.has(topicKey(l)));
+  return fresh.length ? fresh : all;
 }
 
 /** 아나운서 수에 맞춰 대본 형식을 알려 준다. */
@@ -225,6 +230,8 @@ function speakerGuide(speakers) {
  * input: { section, date, announcers: ['이름1', '이름2'], topic, request, draft, selectedEvents? }
  * selectedEvents: 화면에서 고른 행사 [{ date, weekday, text }] (행사 구성에서만 씀)
  * announcers 길이가 아나운서 수(1 또는 2)다. 이름이 비어 있으면 '아나운서1'처럼 자리 표시를 쓴다.
+ * scriptId: 지금 대본 id (이미 쓴 주제에서 자기 자신을 뺀다)
+ * 반환: { text, topic? }  topic은 사자성어·계기교육 주제를 AI가 골랐을 때만
  */
 export async function generateSection(env, input) {
   const names = input.announcers?.length ? input.announcers : [''];
@@ -236,11 +243,19 @@ export async function generateSection(env, input) {
       ? { ...nextWeekRange(input.date), events: input.selectedEvents }
       : await getNextWeekEvents(env, input.date));
   }
-  if (input.section === 'special' && !input.topic) ctx.candidates = await specialCandidates(env, input.date);
+  // 사자성어·계기교육 주제를 비웠으면 이번 학년도에 쓴 주제를 피하고, 고른 주제를 첫 줄로 받는다.
+  const pickTopic = ['idiom', 'special'].includes(input.section) && !input.topic;
+  let used = { idioms: [], specials: [] };
+  if (pickTopic) {
+    try { used = await getUsedTopics(env, input.date, input.scriptId || ''); } catch (err) { console.warn('쓴 주제 읽기 실패: ' + err.message); }
+  }
+  if (input.section === 'special' && !input.topic) ctx.candidates = await specialCandidates(env, input.date, used.specials);
 
   let prompt = sectionPrompt(input.section, ctx) + speakerGuide(speakers);
   if (MIDDLE_SECTIONS.includes(input.section)) prompt += '\n' + MIDDLE_SECTION_RULE;
+  if (pickTopic) prompt += input.section === 'idiom' ? avoidRule('사자성어', used.idioms) : avoidRule('계기교육 주제', used.specials);
   if (input.draft) prompt += `\n\n[학생이 쓴 초안]\n${input.draft}\n초안의 내용과 말투를 최대한 살려서 다듬어 줘.`;
   if (input.request) prompt += `\n\n[추가 요청]\n${input.request}`;
-  return callGemini(env, prompt);
+  const text = await callGemini(env, prompt);
+  return pickTopic ? splitTopicLine(text) : { text };
 }

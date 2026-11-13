@@ -6,6 +6,7 @@ import { listUsers, createUsers, updateUser, resetPassword, deleteUser } from '.
 import { generateSection, SECTIONS } from './ai.js';
 import { getNextWeekEvents } from './weekly-plan.js';
 import { getSpecialTopics } from './commemorations.js';
+import { getUsedTopics } from './used-topics.js';
 import { isValidDate, nextFriday, nowKST, todayKST } from './dates.js';
 import { getHome } from './home.js';
 import { BoardError, listPosts, getPost, createPost, updatePost, deletePost, markRead, postReads } from './board.js';
@@ -323,11 +324,17 @@ async function handleApi(request, env, url) {
     return json(await getSpecialTopics(env, date, { fresh: url.searchParams.get('fresh') === '1' }));
   }
 
+  if (pathname === '/api/topics/used' && method === 'GET') {
+    const date = url.searchParams.get('date');
+    if (!isValidDate(date)) throw new HttpError(400, '방송일을 올바르게 입력해 주세요.');
+    return json(await getUsedTopics(env, date, url.searchParams.get('exclude') || ''));
+  }
+
   if (pathname === '/api/ai/section' && method === 'POST') {
     const body = await readBody(request);
     if (!SECTIONS.includes(body.section)) throw new HttpError(400, '알 수 없는 구성입니다.');
     if (!isValidDate(body.date)) throw new HttpError(400, '방송일을 먼저 입력해 주세요.');
-    const text = await generateSection(env, {
+    return json(await generateSection(env, {
       section: body.section,
       date: body.date,
       announcers: (Array.isArray(body.announcers) ? body.announcers : [])
@@ -336,9 +343,9 @@ async function handleApi(request, env, url) {
       topic: String(body.topic || '').slice(0, 200),
       request: String(body.request || '').slice(0, 500),
       draft: String(body.draft || '').slice(0, MAX_TEXT),
-      selectedEvents: body.section === 'events' ? cleanEvents(body.selectedEvents) : undefined
-    });
-    return json({ text });
+      selectedEvents: body.section === 'events' ? cleanEvents(body.selectedEvents) : undefined,
+      scriptId: String(body.script_id || '').slice(0, 20)
+    }));
   }
 
   throw new HttpError(404, '없는 주소입니다.');
