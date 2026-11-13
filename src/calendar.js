@@ -23,7 +23,15 @@ function parseMembers(v) {
   try { return JSON.parse(v || '[]'); } catch { return []; }
 }
 
-export const toEvent = row => ({ ...row, members: parseMembers(row.members) });
+/** 화면에 보일 이름: 아침방송은 담당자를 붙여 '아침방송-이름', 담당이 없으면 그냥 제목 */
+export function eventLabel(e) {
+  return e.category === MORNING && e.members[0] ? `${MORNING}-${e.members[0]}` : e.title;
+}
+
+export const toEvent = row => {
+  const e = { ...row, members: parseMembers(row.members) };
+  return { ...e, label: eventLabel(e) };
+};
 
 function clean(input) {
   const date = String(input.date || '');

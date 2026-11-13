@@ -336,7 +336,7 @@ function renderHome() {
   $('upcomingList').innerHTML = h.upcoming.length ? h.upcoming.map(e => homeRow({
     query: `?calendar&date=${e.date}`,
     date: e.date,
-    title: e.title,
+    title: e.label,
     sub: `${homeDay(e.date)}${e.time ? ' ' + e.time : ''}${e.members.length ? ', ' + e.members.join(', ') : ''}`,
     chip: `${e.hasScript ? `<span class="cat cat-script">${icon('microphone')}대본</span>` : ''}<span class="cat cat-${esc(e.category)}">${esc(e.category)}</span>`
   })).join('')
@@ -763,7 +763,7 @@ function renderCalendar() {
     const { scripts, events } = itemsOn(date);
     const chips = [
       ...scripts.slice(0, 1).map(() => `<span class="cal-item cat-script">${icon('microphone')}<span>대본</span></span>`),
-      ...events.map(e => `<span class="cal-item cat-${esc(e.category)}"><span>${esc(e.title)}</span></span>`)
+      ...events.map(e => `<span class="cal-item cat-${esc(e.category)}"><span>${esc(e.label)}</span></span>`)
     ];
     const shown = chips.slice(0, 3).join('');
     const more = chips.length > 3 ? `<span class="cal-more">+${chips.length - 3}</span>` : '';
@@ -801,7 +801,7 @@ function renderDay() {
       <div class="event-top">
         <span class="cat cat-${esc(e.category)}">${esc(e.category)}</span>
         ${e.time ? `<span class="event-time">${icon('clock')}${esc(e.time)}</span>` : ''}
-        <b class="grow">${esc(e.title)}</b>
+        <b class="grow">${esc(e.label)}</b>
         ${canEdit ? `<button type="button" class="btn-ghost btn-sm" data-edit="${esc(e.id)}">${icon('pencil-simple')}<span class="hide-sm">고치기</span></button>` : ''}
       </div>
       ${e.members.length ? `<div class="event-members">${icon('users-three')}${e.members.map(m => `<span class="member-tag">${esc(m)}</span>`).join('')}</div>` : ''}

@@ -114,3 +114,17 @@ test('잘못된 주: 월요일 아님, 날짜 아님, 그 주 월~금 밖이면 
   assert.equal((await put(t, { [mon]: '이서', [addDays(mon, -1)]: '박하늘' })).status, 400);
   assert.equal(events().length, 0);
 });
+
+test('보이는 이름: 아침방송은 담당자를 붙이고, 담당이 없거나 다른 일정이면 제목 그대로', async () => {
+  const { eventLabel } = await import('../src/calendar.js');
+  assert.equal(eventLabel({ category: '아침방송', title: '아침방송', members: ['마명선'] }), '아침방송-마명선');
+  assert.equal(eventLabel({ category: '아침방송', title: '아침방송', members: [] }), '아침방송');
+  assert.equal(eventLabel({ category: '연습', title: '발성 연습', members: ['이서'] }), '발성 연습');
+});
+
+test('캘린더 API가 아침방송 일정에 담당자 붙은 label을 준다', { skip }, async () => {
+  const { call, t, put } = await setup();
+  await put(t, { [mon]: '이서' });
+  const r = await call(t, 'GET', `/api/calendar?from=${mon}&to=${tue}`);
+  assert.deepEqual(r.data.events.map(e => [e.title, e.label]), [['아침방송', '아침방송-이서']]);
+});
