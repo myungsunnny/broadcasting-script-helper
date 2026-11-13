@@ -6,7 +6,8 @@ dist/
 .env.*
 
 # 이 컴퓨터에서만 쓰는 설정
-.claude/
+.claude/*
+!.claude/agents/
 
 # 예전 Apps Script 버전 (배포하지 않음)
 _이전_앱스크립트/
