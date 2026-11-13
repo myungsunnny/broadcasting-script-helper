@@ -11,7 +11,7 @@ import { getHome } from './home.js';
 import { BoardError, listPosts, getPost, createPost, updatePost, deletePost, markRead, postReads } from './board.js';
 import { CommentError, listComments, createComment, resolveComment, deleteComment, deleteCommentsStatement, OPEN_COMMENTS_SQL } from './comments.js';
 import { TEACHER, md, myScriptStudents, notifyStatements, deleteNotificationsStatement, listNotifications, unreadCount, markNotificationRead, markAllNotificationsRead } from './notify.js';
-import { CalendarError, listCalendar, upcomingEvents, createEvent, updateEvent, deleteEvent, listMembers } from './calendar.js';
+import { CalendarError, listCalendar, upcomingEvents, createEvent, updateEvent, deleteEvent, listMembers, setMorningDuty } from './calendar.js';
 
 const STATUSES = ['작성중', '검토요청', '완료'];
 const TEXT_FIELDS = ['title', 'announcers', 'memo', ...SECTIONS];
@@ -266,6 +266,10 @@ async function handleApi(request, env, url) {
       if (pathname === '/api/calendar') {
         if (method === 'GET') return json(await listCalendar(env, url.searchParams.get('from'), url.searchParams.get('to')));
         if (method === 'POST') return json(await createEvent(env, user, await readBody(request)), 201);
+      }
+      if (pathname === '/api/calendar/morning' && method === 'PUT') {
+        const body = await readBody(request);
+        return json(await setMorningDuty(env, user, body.start, body.duty));
       }
       const cm = pathname.match(/^\/api\/calendar\/([\w-]+)$/);
       if (cm && method === 'PUT') return json(await updateEvent(env, user, cm[1], await readBody(request)));

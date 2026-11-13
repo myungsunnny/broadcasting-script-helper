@@ -1,15 +1,22 @@
 // 방송부 일정 캘린더
 // 로그인한 부원은 누구나 일정을 보고, 넣고, 고칠 수 있다. 지우기는 만든 사람과 선생님만.
 // 대본(scripts)의 방송일도 함께 돌려줘서 달력에 "대본" 표시가 나오게 한다.
+// '아침방송' 일정은 담당 지정이라 선생님만 만들고 고치고 지운다 (setMorningDuty로 한 주씩).
 
-import { isValidDate, nowKST } from './dates.js';
+import { isValidDate, nowKST, addDays, toDate } from './dates.js';
 import { activeStudents, notifyStatements, deleteNotificationsStatement, md } from './notify.js';
 
-export const CATEGORIES = ['방송', '연습', '회의', '기타'];
+export const CATEGORIES = ['방송', '연습', '회의', '기타', '아침방송'];
+const MORNING = '아침방송';
 const MAX_TEXT = 2000;
 
 export class CalendarError extends Error {
   constructor(status, message) { super(message); this.status = status; }
+}
+
+/** 학생이 아침방송 일정을 건드리면 403 (이전·새 종류 어느 쪽이든) */
+function guardMorning(user, ...categories) {
+  if (user.role !== 'teacher' && categories.includes(MORNING)) throw new CalendarError(403, '아침방송 담당은 선생님만 정할 수 있어요.');
 }
 
 function parseMembers(v) {
@@ -81,6 +88,7 @@ async function getEvent(env, id) {
 
 export async function createEvent(env, user, input) {
   const e = clean(input);
+  guardMorning(user, e.category);
   const id = crypto.randomUUID().slice(0, 8);
   const now = nowKST();
   await env.DB.batch([
@@ -96,6 +104,7 @@ export async function createEvent(env, user, input) {
 export async function updateEvent(env, user, id, input) {
   const old = await getEvent(env, id);
   const e = clean(input);
+  guardMorning(user, old.category, e.category);
   await env.DB.batch([
     env.DB.prepare(
       `UPDATE calendar_events SET date = ?, time = ?, title = ?, category = ?, members = ?, note = ?, record = ?, updated_by = ?, updated_at = ?
@@ -110,6 +119,7 @@ export async function updateEvent(env, user, id, input) {
 
 export async function deleteEvent(env, user, id) {
   const row = await getEvent(env, id);
+  guardMorning(user, row.category);
   const isOwner = user.uid ? row.created_by_uid === user.uid : false;
   if (user.role !== 'teacher' && !isOwner) throw new CalendarError(403, '일정은 만든 사람이나 선생님만 지울 수 있어요.');
   await env.DB.batch([
@@ -117,6 +127,46 @@ export async function deleteEvent(env, user, id) {
     env.DB.prepare('DELETE FROM calendar_events WHERE id = ?').bind(id)
   ]);
   return { ok: true };
+}
+
+/**
+ * 한 주(월~금) 아침방송 담당을 한 번에 정한다. duty = { 'YYYY-MM-DD': '이름' }, 이름 ''은 그날 담당 지우기.
+ * duty에 없는 날은 그대로 둔다. 하루 한 개만 남기고, 새로 담당이 된 학생에게만 알림.
+ */
+export async function setMorningDuty(env, user, start, duty) {
+  guardMorning(user, MORNING);
+  if (!isValidDate(start) || toDate(start).getUTCDay() !== 1) throw new CalendarError(400, '주의 시작은 월요일이어야 해요.');
+  const days = [0, 1, 2, 3, 4].map(n => addDays(start, n));
+  if (!duty || typeof duty !== 'object' || Array.isArray(duty) || Object.keys(duty).some(d => !days.includes(d))) {
+    throw new CalendarError(400, '그 주 월요일부터 금요일까지만 정할 수 있어요.');
+  }
+  const { results } = await env.DB.prepare(
+    'SELECT * FROM calendar_events WHERE category = ? AND date BETWEEN ? AND ? ORDER BY date, created_at'
+  ).bind(MORNING, days[0], days[4]).all();
+  const now = nowKST();
+  const stmts = [];
+  for (const [date, raw] of Object.entries(duty)) {
+    const name = String(raw ?? '').trim().slice(0, 20);
+    const [row, ...extra] = results.filter(r => r.date === date);
+    // 하루 한 개: 비우면 전부, 아니면 겹친 행만 지운다
+    for (const r of name ? extra : results.filter(r => r.date === date)) {
+      stmts.push(deleteNotificationsStatement(env, ['calendar'], r.id), env.DB.prepare('DELETE FROM calendar_events WHERE id = ?').bind(r.id));
+    }
+    if (!name) continue;
+    const e = { date, title: MORNING, members: JSON.stringify([name]) };
+    if (!row) {
+      const id = crypto.randomUUID().slice(0, 8);
+      stmts.push(env.DB.prepare(
+        `INSERT INTO calendar_events (id, date, time, title, category, members, note, record, created_by, created_by_uid, created_at, updated_by, updated_at)
+         VALUES (?, ?, '', ?, ?, ?, '', '', ?, ?, ?, ?, ?)`
+      ).bind(id, date, MORNING, MORNING, e.members, user.name, user.uid || '', now, user.name, now), ...await memberNotices(env, user, id, e));
+    } else if (row.members !== e.members) {
+      stmts.push(env.DB.prepare('UPDATE calendar_events SET members = ?, updated_by = ?, updated_at = ? WHERE id = ?')
+        .bind(e.members, user.name, now, row.id), ...await memberNotices(env, user, row.id, e, parseMembers(row.members)));
+    }
+  }
+  if (stmts.length) await env.DB.batch(stmts);
+  return (await listCalendar(env, days[0], days[4])).events.filter(x => x.category === MORNING);
 }
 
 /** 함께하는 사람으로 고를 수 있는 부원 이름 (사용 중인 학생 계정) */
