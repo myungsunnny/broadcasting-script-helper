@@ -92,7 +92,7 @@ export async function getHome(env, user) {
     kind: 'script', id: s.id, date: s.broadcast_date, time: '', title: s.title, status: s.status
   }));
   const events = soonRes.results.map(toEvent).filter(e => isMember(e, name)).map(e => ({
-    kind: 'event', id: e.id, date: e.date, time: e.time, title: e.title, category: e.category,
+    kind: 'event', id: e.id, date: e.date, time: e.time, title: e.label, category: e.category,
     members: e.members.filter(m => String(m).trim() !== name)
   }));
   // 날짜 빠른 순. 같은 날이면 대본 먼저, 일정은 하루 종일 → 시간 순.
