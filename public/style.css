@@ -276,6 +276,10 @@ label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weig
 .pick-date { font-weight: 700; white-space: nowrap; color: var(--accent-ink); }
 .pick-group { font-size: 13px; font-weight: 700; color: var(--muted); margin: 14px 0 6px; }
 .pick-custom { padding: 6px 10px; font-size: 15px; }
+.used-warn { color: var(--warn); margin-top: 6px; }
+.used-warn:empty { display: none; }
+.used-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.used-list:empty { display: none; }
 .pick-count { margin-top: 8px; }
 
 /* 불러오는 동안 보이는 회색 줄 */

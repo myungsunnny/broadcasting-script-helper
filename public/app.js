@@ -1633,6 +1633,28 @@ function parseChoices(v) {
   return { events: Array.isArray(c.events) ? c.events : [], special: c.special || '', idiom: c.idiom || '' };
 }
 
+/* ── 이미 쓴 주제 (CAP-7): 같은 학년도 다른 대본에서 쓴 사자성어·계기교육. 알려만 주고 막지 않는다. ── */
+// 서버 src/used-topics.js의 topicKey와 같게 유지한다. (괄호 안·띄어쓰기는 빼고 비교)
+const topicKey = s => String(s || '').replace(/[(（][^)）]*[)）]/g, '').replace(/\s+/g, '');
+const usedFind = (list, topic) => topicKey(topic) ? (state.used?.[list] || []).find(u => topicKey(u.topic) === topicKey(topic)) : undefined;
+const usedBadge = u => u ? ` <span class="badge">이미 씀 · ${md(u.date)}</span>` : '';
+const usedWarn = u => u ? `${icon('info')} ${Number(u.date.slice(5, 7))}월 ${Number(u.date.slice(8))}일 방송에서 이미 썼어요. 그래도 쓸까요?` : '';
+
+function renderIdiomUsed() {
+  const list = state.used?.idioms || [];
+  $('idiom-used').innerHTML = list.length
+    ? '<span class="muted small">올해 쓴 사자성어</span> ' + list.map(u => `<span class="badge">${esc(u.topic)} · ${md(u.date)}</span>`).join(' ')
+    : '';
+  updateUsedWarn();
+}
+
+function updateUsedWarn() {
+  $('idiom-warn').innerHTML = usedWarn(usedFind('idioms', $('topic-idiom').value));
+  if (!$('special-warn')) return;
+  const custom = document.querySelector('input[name="topicPick"]:checked')?.value === '__custom';
+  $('special-warn').innerHTML = custom ? usedWarn(usedFind('specials', $('topic-special').value)) : '';
+}
+
 let pickerSeq = 0;
 /**
  * 주간계획 행사와 계기교육 주제를 불러온다.
@@ -1644,8 +1666,9 @@ async function loadPickers({ fresh = false } = {}) {
   const seq = ++pickerSeq;
   const prevKeys = fresh && state.eventInfo?.events ? new Set(state.eventInfo.events.map(evKey)) : null;
   if (!date) {
-    state.eventOpts = state.topicOptions = null;
+    state.eventOpts = state.topicOptions = state.used = null;
     $('pick-events').innerHTML = $('pick-topics').innerHTML = '<span class="muted small">방송일을 먼저 정해 주세요.</span>';
+    renderIdiomUsed();
     return;
   }
   if (fresh) {
@@ -1653,13 +1676,16 @@ async function loadPickers({ fresh = false } = {}) {
     const btn = document.querySelector('[data-pick="reload"]');
     if (btn) { btn.disabled = true; btn.innerHTML = spinner() + '시트 확인 중…'; }
   } else {
-    state.eventOpts = state.topicOptions = null;
+    state.eventOpts = state.topicOptions = state.used = null;
+    renderIdiomUsed();
     $('pick-events').innerHTML = skeleton(4, '주간계획에서 다음 주 행사를 불러오는 중…');
     $('pick-topics').innerHTML = skeleton(4, '계기교육 주제를 찾는 중…');
   }
   const q = '?date=' + encodeURIComponent(date) + (fresh ? '&fresh=1' : '');
-  const [ev, tp] = await Promise.allSettled([api('/api/events' + q), api('/api/topics' + q)]);
+  const usedQ = '?date=' + encodeURIComponent(date) + '&exclude=' + encodeURIComponent(state.current?.id || '');
+  const [ev, tp, used] = await Promise.allSettled([api('/api/events' + q), api('/api/topics' + q), api('/api/topics/used' + usedQ)]);
   if (seq !== pickerSeq) return; // 그사이 방송일이 바뀌었으면 버린다
+  state.used = used.status === 'fulfilled' ? used.value : null; // 못 불러오면 표시 없이 그대로 쓴다
   state.eventInfo = ev.status === 'fulfilled' ? ev.value : { events: [], error: ev.reason.message };
   state.topicOptions = tp.status === 'fulfilled' ? tp.value : [];
 
@@ -1677,6 +1703,7 @@ async function loadPickers({ fresh = false } = {}) {
   }
   renderEventPicker();
   renderTopicPicker();
+  renderIdiomUsed();
 }
 
 function renderEventPicker() {
@@ -1734,7 +1761,7 @@ function renderTopicPicker() {
   const group = (kind, title) => {
     const list = opts.filter(t => t.kind === kind);
     return list.length ? `<div class="pick-group">${title}</div>` + list.map(t => radio(t.label,
-      `${esc(t.label)}${t.dday !== undefined ? ` <span class="badge badge-검토요청">${t.dday === 0 ? '오늘' : 'D-' + t.dday}</span>` : ''}`,
+      `${esc(t.label)}${t.dday !== undefined ? ` <span class="badge badge-검토요청">${t.dday === 0 ? '오늘' : 'D-' + t.dday}</span>` : ''}${usedBadge(usedFind('specials', t.label))}`,
       t.label === cur)).join('') : '';
   };
   $('pick-topics').innerHTML = `
@@ -1745,7 +1772,9 @@ function renderTopicPicker() {
     ${group('계절', '이맘때 어울리는 주제')}
     <div class="pick-group">직접 정하기</div>
     <label class="pick-item"><input type="radio" name="topicPick" value="__custom" ${isCustom ? 'checked' : ''}>
-      <input id="topic-special" class="pick-custom" placeholder="예: 학교폭력 예방" value="${isCustom ? esc(cur) : ''}"></label>`;
+      <input id="topic-special" class="pick-custom" placeholder="예: 학교폭력 예방" value="${isCustom ? esc(cur) : ''}"></label>
+    <div class="small used-warn" id="special-warn" role="status"></div>`;
+  updateUsedWarn();
 }
 
 function chosenTopic() {
@@ -1775,7 +1804,8 @@ function aiInput(key) {
     announcer_count: state.annCount,
     topic: key === 'special' ? chosenTopic() : ($('topic-' + key)?.value.trim() || ''),
     request: $('req-' + key).value.trim(),
-    draft: $('f-' + key).value.trim()
+    draft: $('f-' + key).value.trim(),
+    script_id: state.current?.id || ''
   };
 }
 
@@ -1809,8 +1839,11 @@ async function aiSection(key, { interactive = true, selectedEvents, fresh = fals
   card.classList.add('busy');
   $('status-' + key).innerHTML = spinner() + 'AI가 쓰고 있어요… (30초쯤 걸려요)';
   try {
-    const { text } = await api('/api/ai/section', { method: 'POST', body: input });
+    const { text, topic } = await api('/api/ai/section', { method: 'POST', body: input });
     $('f-' + key).value = text;
+    // AI가 고른 주제를 2단계 칸에 채워 저장한다. 다음 대본이 이 주제를 피할 수 있다.
+    if (topic && key === 'idiom') { $('topic-idiom').value = topic; updateUsedWarn(); }
+    if (topic && key === 'special') { state.choices.special = topic; renderTopicPicker(); }
     $('req-' + key).value = '';
     $('status-' + key).innerHTML = interactive ? icon('check-circle', true) + '새로 썼어요. 소리 내어 읽어 보세요!' : '';
     updateCounts();
@@ -2370,6 +2403,7 @@ function bindEvents() {
     if (e.target.matches('#f-title, #f-broadcast_date')) updateMetaText();
     // 직접 입력 칸에 쓰기 시작하면 '직접 정하기'가 골라지게 한다.
     if (e.target.id === 'topic-special') document.querySelector('input[name="topicPick"][value="__custom"]').checked = true;
+    if (e.target.matches('#topic-idiom, #topic-special, [name="topicPick"]')) updateUsedWarn();
   });
   $('f-broadcast_date').addEventListener('change', () => {
     // 방송일이 바뀌면 '다음 주'와 다가오는 기념일도 바뀌므로 고른 것을 비우고 다시 불러온다.

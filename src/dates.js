@@ -65,3 +65,9 @@ export function parseLooseDate(value, defaultYear) {
   const str = `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
   return isValidDate(str) ? str : null;
 }
+
+/** 방송일이 속한 학년도(3월 1일 ~ 이듬해 2월 말) { start, end } */
+export function schoolYearRange(date) {
+  const y = Number(date.slice(0, 4)) - (Number(date.slice(5, 7)) < 3 ? 1 : 0);
+  return { start: `${y}-03-01`, end: addDays(`${y + 1}-03-01`, -1) };
+}
