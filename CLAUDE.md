@@ -26,7 +26,7 @@ npm run dev       # 로컬 서버 (8787)
 - **DB가 바뀌는 PR은 Merge 전에** 선생님이 원격 DB에 SQL을 먼저 실행해야 합니다(배포가 테이블보다 먼저 나가면 사이트가 깨짐). PR 설명에 실행할 명령을 적습니다.
   - 학교 네트워크에서 `--file` 업로드가 막히면 `--command "..."` 한 줄로 보냅니다. 터미널 탭에는 ASCII만 넣을 수 있어 SQL의 한글 주석은 뺍니다.
 - **비밀값은 코드·PR·커밋·대화에 쓰지 않습니다.** `GEMINI_API_KEY`, `TEACHER_PASSWORD`, `SESSION_SECRET`, `PLAN_SHEET_ID`(주간계획 시트 ID 포함)는 `wrangler secret put` / `gh secret set`으로 선생님이 직접 넣습니다.
-- 커밋하지 않을 것: `.dev.vars`, `_bmad/`, `.claude/`, `_이전_앱스크립트/`.
+- 커밋하지 않을 것: `.dev.vars`, `_bmad/`, `.claude/`(`agents/`만 올림), `_이전_앱스크립트/`.
 - 원격 DB 쓰기 명령은 선생님께 명령을 드려 직접 실행하게 합니다. 읽기(SELECT) 확인은 해도 됩니다.
 
 ## 관리자 역할 (메인 세션)
