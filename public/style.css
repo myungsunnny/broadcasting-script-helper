@@ -319,6 +319,10 @@ label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weig
 .sec-status { min-height: 24px; margin: 8px 0; font-size: 14px; font-weight: 600; color: var(--accent-ink); display: flex; align-items: center; gap: 6px; }
 .redo { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .redo-label { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; font-weight: 600; }
+/* AI 남은 횟수 (학생만). 5번 이하이면 --warn */
+.ai-left { font-size: 13.5px; color: var(--muted); font-weight: 600; }
+.ai-card .ai-left { margin: 10px 0 0; }
+.ai-left.low { color: var(--warn); }
 .chip { min-height: 36px; padding: 0 14px; font-size: 14px; border-color: transparent; background: var(--accent-soft); color: var(--accent-ink); }
 .chip:hover { background: var(--accent-soft-2); }
 .redo-custom { display: flex; gap: 8px; margin-top: 10px; }

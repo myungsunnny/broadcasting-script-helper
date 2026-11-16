@@ -28,6 +28,8 @@
   //   PLAN_SHEET_ID (학교 주간계획 구글 시트 ID. 교직원 정보가 있는 시트라 비밀값으로 둔다)
   "vars": {
     "SCHOOL_NAME": "삼호중앙초등학교",
-    "GEMINI_MODEL": "gemini-3.8-flash"
+    "GEMINI_MODEL": "gemini-3.8-flash",
+    // 학생 한 명이 하루(한국 시간)에 쓸 수 있는 AI 구성 요청 수. 전체 초안 만들기는 5번을 쓴다.
+    "AI_DAILY_LIMIT": "30"
   }
 }

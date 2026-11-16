@@ -1180,6 +1180,7 @@ function buildSections() {
         <span class="small muted redo-label">${icon('sparkle')}AI에게 부탁하기</span>
         ${QUICK_ASKS.map(q => `<button type="button" class="chip" data-quick="${q}" data-key="${s.key}">${q}</button>`).join('')}
         <button type="button" class="chip" data-ai="${s.key}">처음부터 다시</button>
+        <span class="ai-left hidden"></span>
       </div>
       <div class="redo-custom">
         <input class="ai-req" id="req-${s.key}" placeholder="직접 부탁하기 (예: 퀴즈를 하나 넣어 줘)">
@@ -1552,6 +1553,8 @@ function fill(data) {
   $('memoBanner').innerHTML = data.memo ? `${icon('chat-circle-text')}<span><b>메모</b> ${esc(data.memo)}</span>` : '';
 
   SECTIONS.forEach(s => { $('cmi-' + s.key).value = ''; });
+  renderAiLeft();
+  refreshAiLeft();
   startComments(data.id);
 
   state.choices = parseChoices(data.choices);
@@ -1817,6 +1820,43 @@ function namesReady() {
   return false;
 }
 
+/* ── AI 남은 횟수 (학생만. 선생님은 aiLeft가 없어 아무것도 안 보이고 막지 않는다) ── */
+const AI_OUT = '오늘 AI를 다 썼어요. 내일 다시 쓸 수 있어요. 급하면 선생님께 말씀드려요.';
+const AI_LOW = 5; // 이 수 이하이면 --warn 색
+const AI_ALL_COST = SECTIONS.length; // 전체 초안은 구성 수만큼 쓴다
+
+/** 남은 횟수 글자와 AI 버튼 막기를 지금 state.config.aiLeft에 맞춘다. */
+function renderAiLeft() {
+  const left = state.config?.aiLeft;
+  const counted = typeof left === 'number';
+  const out = counted && left <= 0;
+  const short = counted && left < AI_ALL_COST;
+  document.querySelectorAll('.ai-left').forEach(el => {
+    el.classList.toggle('hidden', !counted);
+    el.classList.toggle('low', counted && left <= AI_LOW);
+    let text = out ? AI_OUT : counted ? `오늘 AI ${left}번 남음` : '';
+    if (el.id === 'aiLeftAll' && short && !out) text += ' · 남은 횟수가 부족해요. 4단계에서 구성별로 써 보세요.';
+    el.textContent = text;
+  });
+  document.querySelectorAll('#sectionsBox .redo .chip, #sectionsBox [data-ask]').forEach(b => { b.disabled = state.locked || out; });
+  $('btnAll').disabled = state.locked || short;
+}
+
+/** 서버에서 오늘 남은 횟수를 다시 받는다 (로그인 뒤·날짜가 바뀐 뒤에도 맞게). */
+async function refreshAiLeft() {
+  try { state.config.aiLeft = (await api('/api/me')).config.aiLeft; } catch { return; } // 못 받으면 지난 값 그대로
+  renderAiLeft();
+}
+
+/** AI 응답·거절에 맞춰 남은 횟수를 고친다. render: 전체 초안 중에는 끝난 뒤 한 번에 그린다. */
+function noteAiLeft(left, render) {
+  if (typeof left !== 'number') return;
+  // 전체 초안의 두 응답이 순서가 바뀌어 와도 더 적은(새) 값을 지킨다.
+  const cur = state.config.aiLeft;
+  state.config.aiLeft = typeof cur === 'number' ? Math.min(cur, left) : left;
+  if (render) renderAiLeft();
+}
+
 /**
  * 한 구성을 AI로 쓴다.
  *  interactive: 4단계에서 학생이 직접 누른 경우(확인 창·오류 창을 띄움). 전체 초안에서는 false.
@@ -1824,6 +1864,7 @@ function namesReady() {
  */
 async function aiSection(key, { interactive = true, selectedEvents, fresh = false } = {}) {
   if (state.locked) return;
+  if (interactive && state.config.aiLeft === 0) return alert(AI_OUT); // Enter로 부탁할 때도 막는다
   if (interactive && !namesReady()) return;
   const input = aiInput(key);
   if (fresh) input.draft = '';
@@ -1839,7 +1880,8 @@ async function aiSection(key, { interactive = true, selectedEvents, fresh = fals
   card.classList.add('busy');
   $('status-' + key).innerHTML = spinner() + 'AI가 쓰고 있어요… (30초쯤 걸려요)';
   try {
-    const { text, topic } = await api('/api/ai/section', { method: 'POST', body: input });
+    const { text, topic, aiLeft } = await api('/api/ai/section', { method: 'POST', body: input });
+    noteAiLeft(aiLeft, interactive);
     $('f-' + key).value = text;
     // AI가 고른 주제를 2단계 칸에 채워 저장한다. 다음 대본이 이 주제를 피할 수 있다.
     if (topic && key === 'idiom') { $('topic-idiom').value = topic; updateUsedWarn(); }
@@ -1851,7 +1893,8 @@ async function aiSection(key, { interactive = true, selectedEvents, fresh = fals
     return true;
   } catch (err) {
     $('status-' + key).textContent = '';
-    if (interactive) alert('AI가 쓰지 못했어요: ' + err.message);
+    if (err.status === 429) noteAiLeft(0, interactive);
+    if (interactive) alert(err.status === 429 ? err.message : 'AI가 쓰지 못했어요: ' + err.message);
     else throw err;
   } finally {
     card.classList.remove('busy');
@@ -1870,6 +1913,10 @@ function renderProgress(states) {
 async function aiAll() {
   if (state.locked) return;
   if (!$('f-broadcast_date').value) return alert('방송일을 먼저 정해 주세요.');
+  const left = state.config.aiLeft;
+  if (typeof left === 'number' && left < AI_ALL_COST) {
+    return alert(left > 0 ? `남은 횟수가 부족해요. 초안 만들기는 ${AI_ALL_COST}번을 써요. 4단계에서 구성별로 써 보세요.` : AI_OUT);
+  }
   if (!namesReady()) return goStep(1);
   const selectedEvents = eventsForAI();
   if (selectedEvents === false) return;
@@ -1894,6 +1941,7 @@ async function aiAll() {
       } catch (err) {
         states[i] = 'fail';
         errors.push(`${SECTIONS[i].name}: ${err.message}`);
+        if (err.status === 429) next = SECTIONS.length; // 다 썼으면 남은 구성은 부르지 않는다
       }
       renderProgress(states);
     }
@@ -1902,6 +1950,7 @@ async function aiAll() {
   btn.disabled = false;
   $('btnNext').disabled = $('btnPrev').disabled = false;
   btn.innerHTML = icon('sparkle') + '초안 다시 만들기';
+  renderAiLeft();
   await saveNow();
   if (!errors.length) {
     toast('초안 완성! 이제 소리 내어 읽으며 고쳐 봐요.');

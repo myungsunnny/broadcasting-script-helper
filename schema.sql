@@ -107,3 +107,11 @@ CREATE TABLE IF NOT EXISTS notifications (
   read_at    TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_notif_recipient ON notifications (recipient, read_at, id DESC);
+
+-- AI 사용량: 학생마다 한국 시간 하루에 AI 구성 요청 수 (7일 지나면 셀 때 함께 지움, 선생님은 세지 않음)
+CREATE TABLE IF NOT EXISTS ai_usage (
+  user_uid TEXT NOT NULL,           -- 학생 계정 id
+  day      TEXT NOT NULL,           -- KST YYYY-MM-DD
+  count    INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_uid, day)
+);
