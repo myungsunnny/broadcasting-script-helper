@@ -36,3 +36,9 @@
 - source_spec: `_bmad-output/specs/spec-club-site/stories/6-practice-mode.md`
   summary: 낭독 연습의 구성별 시간 쌓기(넘길 때 앞 구성에 기록, 멈춘 시간 제외, 다시 연습 초기화)를 확인하는 시험이 없다.
   evidence: 상태 전이(`practiceFlush`·`practiceMove`·`practiceRestart`)가 `public/app.js`에 있어 `node:test`가 부를 수 없다. `now`를 받는 순수 함수로 `public/practice.js`에 옮기면 `test/practice.test.js`에 넣을 수 있다. 이번엔 로컬 화면에서 눌러 확인했다.
+- source_spec: `_bmad-output/specs/spec-club-site/stories/8-ai-limit.md`
+  summary: /api/ai/section에서 Gemini 실패 뒤 refundAi까지 실패하는 경우 원래 AI 오류가 그대로 가는지 시험이 없다.
+  evidence: 바깥 try/catch를 지워도 지금 시험은 모두 통과한다. 드문 이중 실패라 영향은 작다.
+- source_spec: `_bmad-output/specs/spec-club-site/stories/8-ai-limit.md`
+  summary: public/app.js의 AI 남은 횟수 표시·버튼 막기(renderAiLeft, aiAll, aiSection)에 자동 시험이 없다.
+  evidence: app.js를 불러오는 시험 틀이 없다. 서버 429가 한도를 지키므로 위험은 화면 동작뿐이고, 학생·선생님 실제 로그인 확인으로 대신한다.

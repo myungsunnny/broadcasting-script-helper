@@ -7,6 +7,7 @@ import { generateSection, SECTIONS } from './ai.js';
 import { getNextWeekEvents } from './weekly-plan.js';
 import { getSpecialTopics } from './commemorations.js';
 import { getUsedTopics } from './used-topics.js';
+import { useAi, refundAi, aiLeft, AI_LIMIT_MESSAGE } from './ai-usage.js';
 import { isValidDate, nextFriday, nowKST, todayKST } from './dates.js';
 import { getHome } from './home.js';
 import { BoardError, listPosts, getPost, createPost, updatePost, deletePost, markRead, postReads } from './board.js';
@@ -183,7 +184,9 @@ async function handleApi(request, env, url) {
         statuses: STATUSES,
         nextFriday: nextFriday(),
         aiReady: !!env.GEMINI_API_KEY,
-        planReady: !!env.PLAN_SHEET_ID
+        planReady: !!env.PLAN_SHEET_ID,
+        // 학생만. 선생님은 없음(undefined라 JSON에서 빠짐). 표가 아직 없어도 로그인 화면은 깨지지 않게 한다.
+        aiLeft: await aiLeft(env, user).catch(err => { console.error('AI 남은 횟수 읽기 실패', err); return undefined; })
       }
     });
   }
@@ -334,18 +337,28 @@ async function handleApi(request, env, url) {
     const body = await readBody(request);
     if (!SECTIONS.includes(body.section)) throw new HttpError(400, '알 수 없는 구성입니다.');
     if (!isValidDate(body.date)) throw new HttpError(400, '방송일을 먼저 입력해 주세요.');
-    return json(await generateSection(env, {
-      section: body.section,
-      date: body.date,
-      announcers: (Array.isArray(body.announcers) ? body.announcers : [])
-        .slice(0, Number(body.announcer_count) === 2 ? 2 : 1)
-        .map(n => String(n || '').trim().slice(0, 20)),
-      topic: String(body.topic || '').slice(0, 200),
-      request: String(body.request || '').slice(0, 500),
-      draft: String(body.draft || '').slice(0, MAX_TEXT),
-      selectedEvents: body.section === 'events' ? cleanEvents(body.selectedEvents) : undefined,
-      scriptId: String(body.script_id || '').slice(0, 20)
-    }));
+    // 학생은 하루 횟수를 하나 쓰고(null = 다 씀), AI 쪽 실패면 되돌린다. 선생님은 left가 undefined.
+    const left = await useAi(env, user);
+    if (left === null) throw new HttpError(429, AI_LIMIT_MESSAGE);
+    let result;
+    try {
+      result = await generateSection(env, {
+        section: body.section,
+        date: body.date,
+        announcers: (Array.isArray(body.announcers) ? body.announcers : [])
+          .slice(0, Number(body.announcer_count) === 2 ? 2 : 1)
+          .map(n => String(n || '').trim().slice(0, 20)),
+        topic: String(body.topic || '').slice(0, 200),
+        request: String(body.request || '').slice(0, 500),
+        draft: String(body.draft || '').slice(0, MAX_TEXT),
+        selectedEvents: body.section === 'events' ? cleanEvents(body.selectedEvents) : undefined,
+        scriptId: String(body.script_id || '').slice(0, 20)
+      });
+    } catch (err) {
+      try { await refundAi(env, user); } catch (e) { console.error('AI 횟수 되돌리기 실패', e); }
+      throw err;
+    }
+    return json(left === undefined ? result : { ...result, aiLeft: left });
   }
 
   throw new HttpError(404, '없는 주소입니다.');

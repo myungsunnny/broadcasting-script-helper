@@ -165,12 +165,13 @@ test('지우기: 글과 읽음 기록·알림을 같은 batch로', async () => {
   await rejects(deletePost(env, teacher, 'none'), 404);
 });
 
-test('deleteUser: 그 학생의 공지 읽음 기록·알림을 같은 batch로 지움', async () => {
+test('deleteUser: 그 학생의 공지 읽음 기록·알림·AI 사용 기록을 같은 batch로 지움', async () => {
   const env = fakeEnv();
   await deleteUser(env, 'u1');
   assert.deepEqual(env.batches, [[
     { sql: 'DELETE FROM post_reads WHERE user_uid = ?', args: ['u1'] },
     { sql: 'DELETE FROM notifications WHERE recipient = ?', args: ['u1'] },
+    { sql: 'DELETE FROM ai_usage WHERE user_uid = ?', args: ['u1'] },
     { sql: 'DELETE FROM users WHERE id = ?', args: ['u1'] }
   ]]);
 });
