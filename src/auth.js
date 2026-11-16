@@ -4,6 +4,7 @@
 // 로그인하면 서명된 쿠키를 발급한다. 학생은 요청마다 계정이 아직 쓸 수 있는지 확인한다.
 
 import { nowKST } from './dates.js';
+import { reserveAttempt, releaseIp, clearFails } from './login-limit.js';
 
 const COOKIE = 'bs_session';
 const MAX_AGE = 60 * 60 * 24 * 30; // 30일
@@ -84,12 +85,18 @@ function sessionCookie(token) {
   return `${COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${MAX_AGE}`;
 }
 
-/** 로그인 성공 시 { user, cookie } 반환, 실패 시 null */
-export async function login(env, loginId, password) {
+/**
+ * 로그인 성공 시 { user, cookie }, 실패 시 null, 최근 실패가 너무 많으면 { blocked: true }(비밀번호 확인 안 함).
+ * ip: CF-Connecting-IP (빈 값이면 주소 기준 제한은 건너뜀)
+ */
+export async function login(env, loginId, password, ip = '') {
   requireSecrets(env);
   loginId = String(loginId || '').trim().slice(0, 30);
   password = String(password || '');
   if (!loginId || !password) return null;
+  // 먼저 적고 센다: 틀리면 이 기록이 그대로 실패 기록이 된다.
+  const attempt = await reserveAttempt(env, loginId, ip);
+  if (attempt.blocked) return { blocked: true };
 
   const row = await env.DB.prepare('SELECT * FROM users WHERE login_id = ?').bind(loginId).first();
   let user = null;
@@ -100,6 +107,8 @@ export async function login(env, loginId, password) {
     user = { name: loginId, role: 'teacher', mustChange: false };
   }
   if (!user) return null;
+  await clearFails(env, loginId);
+  await releaseIp(env, attempt);
   const token = await sign({ uid: user.uid, name: user.name, role: user.role, exp: Date.now() + MAX_AGE * 1000 }, env.SESSION_SECRET);
   return { user, cookie: sessionCookie(token) };
 }

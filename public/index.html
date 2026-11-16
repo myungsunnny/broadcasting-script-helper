@@ -101,6 +101,12 @@
           </table>
         </div>
       </div>
+
+      <div class="card">
+        <h3><i class="ph ph-database"></i>데이터 백업</h3>
+        <p class="muted small">대본, 일정, 게시판, 계정 목록 같은 사이트 기록을 파일 하나로 내려받아요. 비밀번호는 들어가지 않아요. 학생 이름이 들어 있으니 선생님만 보관해요.</p>
+        <button class="btn-ghost" id="btnBackup"><i class="ph ph-download-simple"></i>백업 내려받기</button>
+      </div>
     </section>
 
     <!-- 홈 (첫 화면) -->
@@ -530,12 +536,14 @@
         <details class="faq"><summary>행사 목록에 이번 주 행사가 안 보여요.</summary><p>방송일 <b>다음 주</b>(월~금) 행사만 보여요. 방송일이 맞는지 확인하고, <b>학교 행사 다시 확인</b>을 눌러요. 그래도 없으면 선생님께 주간계획 시트를 확인해 달라고 해요.</p></details>
         <details class="faq"><summary>대본이 잠겨서 고칠 수 없어요.</summary><p>선생님이 <b>완료</b>한 대본이에요. 더 고쳐야 하면 선생님께 말씀드려요.</p></details>
         <details class="faq"><summary>비밀번호를 잊어버렸어요.</summary><p>선생님께 <b>비밀번호 초기화</b>를 부탁해요. 새 임시 비밀번호로 들어가서 다시 바꾸면 돼요.</p></details>
+        <details class="faq"><summary>비밀번호를 여러 번 틀려서 막혔어요.</summary><p>10분 기다렸다가 다시 해 보세요. 비밀번호가 생각나지 않으면 선생님께 <b>비밀번호 초기화</b>를 부탁해요. 초기화하면 바로 들어올 수 있어요.</p></details>
       </section>
 
       <section class="card help-card teacher-only" id="h-teacher">
         <h3 class="help-title"><span class="h-icon"><i class="ph ph-chalkboard-teacher"></i></span>선생님 안내</h3>
         <ul class="help-steps plain-list">
-          <li><b>학생 계정</b>: 오른쪽 위 내 이름 버튼을 누르고 <b>학생 계정 관리</b>에서 이름을 한 줄에 한 명씩 넣으면 4자리 임시 비밀번호가 만들어져요. 표를 인쇄해 나눠 주세요.</li>
+          <li><b>학생 계정</b>: 오른쪽 위 내 이름 버튼을 누르고 <b>학생 계정 관리</b>에서 이름을 한 줄에 한 명씩 넣으면 4자리 임시 비밀번호가 만들어져요. 표를 인쇄해 나눠 주세요. 비밀번호를 여러 번 틀려 로그인이 막힌 학생은 <b>비밀번호 초기화</b>를 하면 바로 들어올 수 있어요.</li>
+          <li><b>백업</b>: <b>학생 계정 관리</b> 맨 아래 <b>백업 내려받기</b>를 누르면 사이트 기록이 <b>방송부-백업-날짜.json</b> 파일로 저장돼요. 가끔 받아 두세요.</li>
           <li><b>미리 골라 두기</b>: 이번 주 대본을 먼저 열어 행사와 계기교육 주제를 골라 두면 학생 화면에도 그대로 보여요.</li>
           <li><b>검토하기</b>: 홈 맨 위 <b>검토 기다리는 대본</b> 카드에 <span class="badge badge-검토요청">검토요청</span> 대본이 방송일 빠른 순으로 모여요(최대 10개). 누르면 그 대본이 열려요. <b>대본</b> 메뉴의 목록에서 상태로 걸러 찾아도 돼요.</li>
           <li><b>검토 의견</b>: 4단계에서 고칠 구성 탭을 열고 맨 아래 <b>의견 남기기</b> 칸에 쓴 뒤 <span class="btn btn-primary btn-sm demo"><i class="ph ph-paper-plane-right"></i>남기기</span>를 눌러요(1000자까지). 학생 화면의 그 탭에 <span class="cm-badge">의견 1</span>이 붙고, 학생이 <b>반영했어요</b>를 누르면 의견 아래에 <b>반영함 · 이름 날짜</b>가 보여요. 의견을 남겨도 상태는 <span class="badge badge-검토요청">검토요청</span> 그대로라서, 학생이 고친 뒤 다시 검토 요청해요. 의견은 선생님 누구나 <b>지우기</b>로 지울 수 있고, 대본을 지우면 의견도 함께 지워져요. 저장하기 전 새 대본에는 의견 칸이 보이지 않아요. 전체에 대한 말은 지금처럼 메모 칸에 남겨도 돼요.</li>

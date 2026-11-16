@@ -1071,6 +1071,25 @@ async function showAccounts() {
   } catch (err) { $('userBody').innerHTML = `<tr><td colspan="5">${esc(err.message)}</td></tr>`; }
 }
 
+/** 서버가 준 백업(JSON)을 방송부-백업-YYYY-MM-DD.json(한국 날짜) 파일로 저장한다. */
+async function downloadBackup() {
+  const btn = $('btnBackup');
+  btn.disabled = true;
+  try {
+    const data = await api('/api/backup');
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `방송부-백업-${String(data.created_at).slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('백업 파일을 저장했어요.');
+  } catch (err) { toast(err.message); }
+  finally { btn.disabled = false; }
+}
+
 function showIssued(list) {
   $('issuedBody').innerHTML = list.map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.login_id)}</td><td>${esc(u.password)}</td></tr>`).join('');
   $('issuedBox').classList.remove('hidden');
@@ -1440,7 +1459,8 @@ async function saveNow() {
       saved = await api('/api/scripts/' + state.current.id, { method: 'PUT', body: { ...d, base_updated_at: state.current.updated_at } });
     } else {
       saved = await api('/api/scripts', { method: 'POST', body: d });
-      history.replaceState(null, '', '/?id=' + encodeURIComponent(saved.id));
+      // 응답이 늦게 와서 이미 다른 화면으로 갔으면 주소를 바꾸지 않는다.
+      if (!$('editView').classList.contains('hidden')) history.replaceState(null, '', '/?id=' + encodeURIComponent(saved.id));
     }
     state.current = saved;
     // 새 대본이 처음 저장되면 선생님 의견 칸이 보인다.
@@ -2409,6 +2429,7 @@ function bindEvents() {
   $('btnAccounts').addEventListener('click', () => { if (confirmLeave()) navigate('?accounts'); });
   $('btnAccountsBack').addEventListener('click', () => navigate('')); // 홈으로
   $('btnAddUsers').addEventListener('click', addUsers);
+  $('btnBackup').addEventListener('click', downloadBackup);
   $('userBody').addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
     if (b) userAction(b.dataset.act, b.closest('[data-uid]').dataset.uid);

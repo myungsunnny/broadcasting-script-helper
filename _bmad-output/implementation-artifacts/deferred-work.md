@@ -7,12 +7,6 @@
   summary: 홈의 '이번 주 대본' 버튼이 이미 있는 대본을 두 번 만들지 않는지 자동으로 확인하는 테스트가 없다.
   evidence: 위와 같은 이유. 로그인 직후, 이번 주 대본이 이미 있을 때 버튼을 바로 눌러 보는 수동 확인으로 대신한다.
 - source_spec: `_bmad-output/specs/spec-club-site/stories/1-menu-overhaul.md`
-  summary: `npm run check`에 `node --check public/app.js`를 더해 CI와 맞춘다.
-  evidence: `package.json`의 check는 `src/index.js`만 문법 검사하고, CI만 `public/app.js`를 검사한다. 이번 스토리 전부터 있던 차이다.
-- source_spec: `_bmad-output/specs/spec-club-site/stories/1-menu-overhaul.md`
-  summary: 새 대본을 처음 저장하는 중에 다른 화면으로 가면, 늦게 온 저장 응답이 주소를 `?id=`로 바꾼다.
-  evidence: `public/app.js` `saveNow()`가 POST 뒤 무조건 `history.replaceState`를 한다. 예전 일정·로고 버튼에도 있던 문제인데, 메뉴가 늘어 더 자주 생길 수 있다. 편집 화면이 아직 보일 때만 주소를 바꾸면 된다.
-- source_spec: `_bmad-output/specs/spec-club-site/stories/1-menu-overhaul.md`
   summary: (확인 안 됨, 사실이면 medium) 휴대폰에서 대본을 쓸 때 화면 키보드가 열리면 하단 메뉴 막대와 단계 이동 막대가 함께 올라와 쓰는 칸을 가릴 수 있다.
   evidence: 안드로이드 실기기에서 키보드를 열고 4단계 대본 칸을 써 보면 확인된다. 사실이면 입력 칸에 포커스가 있을 때 하단 메뉴를 숨기는 방법이 있다.
 - source_spec: `_bmad-output/specs/spec-club-site/stories/1-menu-overhaul.md`
@@ -42,3 +36,9 @@
 - source_spec: `_bmad-output/specs/spec-club-site/stories/8-ai-limit.md`
   summary: public/app.js의 AI 남은 횟수 표시·버튼 막기(renderAiLeft, aiAll, aiSection)에 자동 시험이 없다.
   evidence: app.js를 불러오는 시험 틀이 없다. 서버 429가 한도를 지키므로 위험은 화면 동작뿐이고, 학생·선생님 실제 로그인 확인으로 대신한다.
+- source_spec: `_bmad-output/specs/spec-club-site/stories/9-login-limit-backup.md`
+  summary: 새 대본을 처음 저장하는 중에 다른 대본을 열면, 늦게 온 저장 응답이 주소(`?id=`)와 `state.current`를 앞 대본 것으로 바꾼다.
+  evidence: `public/app.js` `saveNow()`는 응답 뒤 `state.current = saved`를 무조건 하고, B1 고침은 편집 화면이 숨겨진 경우만 막는다. 저장 전에 `state.current`를 잡아 두고 같을 때만 바꾸면 된다. 이번 스토리 전부터 있던 문제다.
+- source_spec: `_bmad-output/specs/spec-club-site/stories/9-login-limit-backup.md`
+  summary: `saveNow()`의 주소 바꾸기 조건(B1)과 백업 버튼(`downloadBackup`)에 자동 시험이 없다.
+  evidence: `public/app.js`를 불러오는 시험 틀이 없다. 서버 `/api/backup`은 `test/backup.test.js`가 확인하고, 화면은 메인 폴더에서 실제로 눌러 확인한다.

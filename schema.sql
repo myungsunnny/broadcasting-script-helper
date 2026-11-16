@@ -115,3 +115,10 @@ CREATE TABLE IF NOT EXISTS ai_usage (
   count    INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_uid, day)
 );
+
+-- 로그인 실패 기록: 최근 10분 실패가 많으면 잠깐 막음 (10분 지난 기록은 실패를 적을 때 함께 지움)
+CREATE TABLE IF NOT EXISTS login_fails (
+  key TEXT NOT NULL,     -- 'id:<아이디>' 또는 'ip:<주소>'
+  at  INTEGER NOT NULL   -- 실패한 때 (Date.now() 밀리초)
+);
+CREATE INDEX IF NOT EXISTS idx_login_fails_key ON login_fails (key, at);
