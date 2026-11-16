@@ -4,6 +4,7 @@
 import { hashPassword, tempPassword } from './auth.js';
 import { nowKST } from './dates.js';
 import { deleteRecipientStatement } from './notify.js';
+import { clearFails } from './login-limit.js';
 
 const MAX_NAME = 20;
 
@@ -70,6 +71,8 @@ export async function resetPassword(env, id) {
   if (!row) throw new Error('계정을 찾을 수 없어요.');
   const password = tempPassword();
   await env.DB.prepare('UPDATE users SET password_hash = ?, must_change = 1 WHERE id = ?').bind(await hashPassword(password), id).run();
+  // 로그인이 막혀 있던 학생도 바로 들어올 수 있게 (clearFails는 오류를 삼키므로 초기화는 늘 성공)
+  await clearFails(env, row.login_id);
   return { id, name: row.name, login_id: row.login_id, password };
 }
 

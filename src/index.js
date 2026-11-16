@@ -7,6 +7,8 @@ import { generateSection, SECTIONS } from './ai.js';
 import { getNextWeekEvents } from './weekly-plan.js';
 import { getSpecialTopics } from './commemorations.js';
 import { getUsedTopics } from './used-topics.js';
+import { LOGIN_LIMIT_MESSAGE } from './login-limit.js';
+import { getBackup } from './backup.js';
 import { useAi, refundAi, aiLeft, AI_LIMIT_MESSAGE } from './ai-usage.js';
 import { isValidDate, nextFriday, nowKST, todayKST } from './dates.js';
 import { getHome } from './home.js';
@@ -167,7 +169,8 @@ async function handleApi(request, env, url) {
 
   if (pathname === '/api/login' && method === 'POST') {
     const { name, password } = await readBody(request);
-    const result = await login(env, name, password);
+    const result = await login(env, name, password, request.headers.get('CF-Connecting-IP') || '');
+    if (result?.blocked) throw new HttpError(429, LOGIN_LIMIT_MESSAGE);
     if (!result) throw new HttpError(401, '아이디 또는 비밀번호가 맞지 않아요.');
     return json({ user: result.user }, 200, { 'Set-Cookie': result.cookie });
   }
@@ -202,6 +205,12 @@ async function handleApi(request, env, url) {
 
   // 홈(첫 화면) 묶음: 이번 주 대본, 내 할 일, 다가오는 일정, 공지, (선생님) 검토 기다리는 대본
   if (pathname === '/api/home' && method === 'GET') return json(await getHome(env, user));
+
+  // 데이터 백업 내려받기 (선생님만, 읽기만)
+  if (pathname === '/api/backup' && method === 'GET') {
+    if (user.role !== 'teacher') throw new HttpError(403, '백업은 선생님만 받을 수 있어요.');
+    return json(await getBackup(env), 200, { 'Cache-Control': 'no-store' }); // 학교 공용 컴퓨터에 남지 않게
+  }
 
   if (pathname.startsWith('/api/users')) {
     if (user.role !== 'teacher') throw new HttpError(403, '학생 계정 관리는 선생님만 할 수 있어요.');
